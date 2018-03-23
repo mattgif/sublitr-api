@@ -2,7 +2,7 @@
   "name": "sublitr-api",
   "version": "1.0.0",
   "description": "Lightweight submission manager (server side)",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "test": "mocha --exit"
   },

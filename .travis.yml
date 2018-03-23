@@ -1,0 +1,11 @@
+language: node_js
+node_js: node
+services:
+- mongodb
+deploy:
+  provider: heroku
+  api_key:
+    secure: OcHFhIfhc53JZBRiYxehwJjUHHdv/lKg4HjMTdEG9nOESEXQ+0vYtTvpEuTVDePX7yiL28fpmh6LBhNG05zpaPP1zTdr37OcK4kWWNrPKPjm5k7JcWH1x909ItQN4uyCuZJ6kuqYIMEpvR6Tiz+MURTiEtpsHK2wKsoZrX9XjjLQGomV96seRXmwLY+vxe7+sGSvoZgzkMN+/PNxq0z+LYUPHKpl++9j9Ch+nxwrIdde7alRZ0w6z7IhMyB1DEvGRPAfdZwtNH9eIYf7JoDOhcWpi/FyXtX86YqJoNKDFs2At9uRmysw2rH0XEVbuDSZRUyIZGJzUJif1K084YGO4KkjeSNbk1aWYgN/YFQvuO+OvmhUi3P8+zjGYVqZSkPIUoz2Rwg0C7K+DmLJIeEx8Uica0eryoqTWeqLsa7wrnt0YDi8rahOlV8JrDEg/awPNYh5NzRDXoYYVd3YX1ojalyFI0DeAoX5Bzc55you5+fmDEZxgEsHA59HD+VDiAVJ7L6cYAr/+b4asOyMeJyczLZyEDXJYKkAUV1CgORVun4+mQ/btmIVMoa5yAm6dbi6RA+WTc8pHI0xwh69W2fSpU616OYpJBWYpmivL2yq1a4La+PoARMyoBQvFvYFsW5FVBwS9oO8+lOeRBvnJUEy7J8VYsFWO1HdvcRnagUZF9w=
+  app: sublitr
+  on:
+    repo: mattgif/sublitr-api
