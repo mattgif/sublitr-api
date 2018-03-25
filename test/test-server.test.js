@@ -3,11 +3,15 @@
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 const faker = require('faker');
+const mongoose = require('mongoose');
 
-const {app} = require('../server');
+const {app, runServer, closeServer} = require('../server');
+const {TEST_DATABASE_URL} = require('../config');
 
 const expect = chai.expect;
 chai.use(chaiHttp);
+
+const {User} = require('../users/models');
 
 // used to generate an object representing a new user
 function generateNewUser() {
@@ -17,6 +21,12 @@ function generateNewUser() {
         email: faker.internet.email(),
         password: faker.internet.password()
     }
+}
+
+// tear down for afterEach block
+function tearDownDb() {
+    console.warn('Deleting test database');
+    return mongoose.connection.dropDatabase();
 }
 
 describe('API', function() {
@@ -42,6 +52,18 @@ describe('API', function() {
 });
 
 describe('users API', () => {
+    before(function() {
+        return runServer(TEST_DATABASE_URL);
+    });
+
+    afterEach(function() {
+        return tearDownDb();
+    });
+
+    after(function() {
+        closeServer();
+    });
+
     describe('POST endpoint', () => {
         it('should reject users with missing email', () => {
             const userWithoutEmail = {
@@ -170,7 +192,7 @@ describe('users API', () => {
 
         it('should reject users with non-trimmed email', () => {
             const userWithWhiteSpaceEmail = generateNewUser();
-            userWithWhiteSpaceEmail.email = ` ${userWithWhiteSpaceEmail.email}`
+            userWithWhiteSpaceEmail.email = ` ${userWithWhiteSpaceEmail.email}`;
             return chai.request(app)
                 .post('/api/users')
                 .send(userWithWhiteSpaceEmail)
@@ -253,37 +275,16 @@ describe('users API', () => {
         });
 
         it('should reject users with emails that already exist', () => {
+            const newUser = generateNewUser();
             // Create an initial user
-            return User.create({
-                username,
-                password,
-                firstName,
-                lastName
-            })
-                .then(() =>
-                    // Try to create a second user with the same username
-                    chai.request(app).post('/api/users').send({
-                        username,
-                        password,
-                        firstName,
-                        lastName
-                    })
-                )
-                .then(() =>
-                    expect.fail(null, null, 'Request should not succeed')
-                )
-                .catch(err => {
-                    if (err instanceof chai.AssertionError) {
-                        throw err;
-                    }
-
-                    const res = err.response;
+            return User.create(newUser)
+            // Try to create a second user with the same username
+                .then(() =>chai.request(app).post('/api/users').send(newUser))
+                .then(res => {
                     expect(res).to.have.status(422);
                     expect(res.body.reason).to.equal('ValidationError');
-                    expect(res.body.message).to.equal(
-                        'Username already taken'
-                    );
-                    expect(res.body.location).to.equal('username');
+                    expect(res.body.message).to.equal('User with that email already exists');
+                    expect(res.body.location).to.equal('email');
                 });
         });
 
