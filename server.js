@@ -1,9 +1,12 @@
 const express = require('express');
 const app = express();
+const passport = require('passport');
 const cors= require('cors');
 const {CLIENT_ORIGIN} = require('./config');
 
 const userRouter = require('./users/router');
+const {localStrategy} = require('./auth/strategies');
+const authRouter = require('./auth/router');
 const PORT = process.env.PORT || 3000;
 
 const {DATABASE_URL} = require('./config');
@@ -17,7 +20,10 @@ app.use(
     })
 );
 
+passport.use(localStrategy);
+
 app.use('/api/users', userRouter);
+app.use('/api/auth', authRouter);
 
 app.get('*', (req, res) => {
    res.status(404).json({message: 'endpoint not found'});
