@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const bodyParser = require('body-parser');
 
+const {User} = require('./models');
+
 const jsonParser = bodyParser.json();
 
 router.get('/', (req, res) => {
@@ -74,6 +76,28 @@ router.post('/', jsonParser, (req, res) => {
             location: tooLargeField || tooSmallField
         })
     }
+
+    // TODO: regex email validation
+
+    let {email, firstName, lastName, password} = req.body;
+    firstName = firstName.trim();
+    lastName = lastName.trim();
+
+    return User.find({email})
+        // Check if user w/that email is already in the db
+        .count()
+        .then(count => {
+            if (count > 0) {
+                return Promise.reject({
+                    code: 422,
+                    reason: 'ValidationError',
+                    message: 'User with that email already exists',
+                    location: 'email'
+                })
+            }
+        });
+
+
 
     const {firstName, lastName, email} = req.body;
     res.status(201).json({
