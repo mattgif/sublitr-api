@@ -33,6 +33,17 @@ const UserSchema = mongoose.Schema({
     }
 });
 
+UserSchema.methods.serialize = function() {
+    return {
+        firstName: this.firstName,
+        lastName: this.lastName,
+        admin: this.admin,
+        editor: this.editor,
+        email: this.email,
+        id: this._id
+    }
+};
+
 const User = mongoose.model('User', UserSchema);
 
 module.exports = {User};

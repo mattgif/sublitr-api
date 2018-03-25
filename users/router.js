@@ -88,6 +88,7 @@ router.post('/', jsonParser, (req, res) => {
         .count()
         .then(count => {
             if (count > 0) {
+                // Reject if collision found
                 return Promise.reject({
                     code: 422,
                     reason: 'ValidationError',
@@ -95,19 +96,23 @@ router.post('/', jsonParser, (req, res) => {
                     location: 'email'
                 })
             }
+            // No user w/email exists, good to go
+            return User.create({
+                email,
+                firstName,
+                lastName,
+                password
+            });
+        })
+        .then(user => {
+           return res.status(201).json(user.serialize());
+        })
+        .catch(err => {
+            if (err.reason === 'ValidationError') {
+                return res.status(err.code).json(err);
+            }
+            res.status(500).json({code: 500, message: 'Internal server error'})
         });
-
-
-
-    const {firstName, lastName, email} = req.body;
-    res.status(201).json({
-        id: '',
-        firstName,
-        lastName,
-        email,
-        editor: false,
-        admin: false
-    })
 });
 
 module.exports = router;
