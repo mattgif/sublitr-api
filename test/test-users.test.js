@@ -7,11 +7,10 @@ const mongoose = require('mongoose');
 
 const {app, runServer, closeServer} = require('../server');
 const {TEST_DATABASE_URL} = require('../config');
+const {User} = require('../users/models');
 
 const expect = chai.expect;
 chai.use(chaiHttp);
-
-const {User} = require('../users/models');
 
 // used to generate an object representing a new user
 function generateNewUser() {

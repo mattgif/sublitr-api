@@ -1,18 +1,23 @@
 const express = require('express');
-const app = express();
 const passport = require('passport');
-const cors= require('cors');
-const {CLIENT_ORIGIN} = require('./config');
+const cors = require('cors');
+const morgan = require('morgan');
 
 const userRouter = require('./users/router');
-const {localStrategy} = require('./auth/strategies');
+const localStrategy = require('./auth/strategies');
 const authRouter = require('./auth/router');
 const PORT = process.env.PORT || 3000;
 
+const {CLIENT_ORIGIN} = require('./config');
 const {DATABASE_URL} = require('./config');
 const mongoose = require('mongoose');
+
 mongoose.Promise = global.Promise;
 mongoose.connect(DATABASE_URL);
+
+const app = express();
+
+// app.use(morgan('common'));
 
 app.use(
     cors({
