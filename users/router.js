@@ -77,7 +77,20 @@ router.post('/', jsonParser, (req, res) => {
         })
     }
 
-    // TODO: regex email validation
+    // Check that email follows valid pattern
+    const emailIsValid = email => {
+        const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+        return re.test(String(email).toLowerCase());
+    };
+
+    if (!(emailIsValid(req.body.email))) {
+        res.status(422).json({
+            code: 422,
+            reason: 'ValidationError',
+            message: 'Invalid email address',
+            location: 'email'
+        })
+    }
 
     let {email, firstName, lastName, password} = req.body;
     firstName = firstName.trim();
@@ -96,12 +109,15 @@ router.post('/', jsonParser, (req, res) => {
                     location: 'email'
                 })
             }
-            // No user w/email exists, good to go
+            // No user w/email exists, generate hashed pw
+            return User.hashPassword(password);
+        })
+        .then(hashedPassword => {
             return User.create({
                 email,
                 firstName,
                 lastName,
-                password
+                password: hashedPassword
             });
         })
         .then(user => {

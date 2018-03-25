@@ -206,7 +206,7 @@ describe('users API', () => {
 
         it('should reject users with non-trimmed password', () => {
             const userWithWhiteSpacePassword = generateNewUser();
-            userWithWhiteSpacePassword.password = ` ${userWithWhiteSpacePassword.password}`
+            userWithWhiteSpacePassword.password = ` ${userWithWhiteSpacePassword.password}`;
             return chai.request(app)
                 .post('/api/users')
                 .send(userWithWhiteSpacePassword)
@@ -288,6 +288,23 @@ describe('users API', () => {
                 });
         });
 
+        describe('reject users with invalid email address', () => {
+            const invalidEmails = ['asdf', 'asdf.com', 'asdf@asdf', '@.com'];
+            invalidEmails.forEach(invalidAddress => {
+                it(`should reject email of ${invalidAddress}`, () => {
+                    const newUser = generateNewUser();
+                    newUser.email = invalidAddress;
+                    return chai.request(app).post('/api/users').send(newUser)
+                        .then(res => {
+                            expect(res).to.have.status(422);
+                            expect(res.body.reason).to.equal('ValidationError');
+                            expect(res.body.message).to.equal('Invalid email address');
+                            expect(res.body.location).to.equal('email');
+                        })
+                });
+            });
+        });
+
         it('should add a new user', () => {
             const newUser = generateNewUser();
             return chai.request(app)
@@ -308,6 +325,17 @@ describe('users API', () => {
                     expect(res.body.firstName).to.equal(newUser.firstName);
                     expect(res.body.lastName).to.equal(newUser.lastName);
                     expect(res.body.email).to.equal(newUser.email);
+                //    check for new user in db
+                    return User.findOne({email: newUser.email})
+                })
+                .then(user => {
+                    expect(user).to.not.be.null;
+                    expect(user.firstName).to.equal(newUser.firstName);
+                    expect(user.lastName).to.equal(newUser.lastName);
+                    return user.validatePassword(newUser.password);
+                })
+                .then(passwordIsCorrect => {
+                    expect(passwordIsCorrect).to.be.true;
                 })
         })
     })
