@@ -84,7 +84,7 @@ router.post('/', jsonParser, (req, res) => {
     };
 
     if (!(emailIsValid(req.body.email))) {
-        res.status(422).json({
+        return res.status(422).json({
             code: 422,
             reason: 'ValidationError',
             message: 'Invalid email address',
