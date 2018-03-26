@@ -37,7 +37,7 @@ describe('users API', () => {
     });
 
     after(function() {
-        closeServer();
+        return closeServer();
     });
 
     describe('POST endpoint', () => {
