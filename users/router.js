@@ -1,16 +1,49 @@
 const express = require('express');
 const router = express.Router();
 const bodyParser = require('body-parser');
+const passport = require('passport');
 
 const {User} = require('./models');
 
 const jsonParser = bodyParser.json();
+const jwtAuth = passport.authenticate('jwt', {session: false});
+
+router.use(jsonParser);
 
 router.get('/', (req, res) => {
     res.status(200).json({ok: true})
 });
 
-router.post('/', jsonParser, (req, res) => {
+router.put('/:id', jwtAuth, (req, res) => {
+    // check for admin privileges
+    if (!req.user.admin) {
+        return res.status(401).json({
+            code: 401,
+            reason: 'AuthenticationError',
+            message: 'Not admin'
+        })
+    }
+
+    const updated = {};
+    const topLevelFields = ['firstName', 'lastName', 'email', 'admin', 'editor'];
+    topLevelFields.forEach(field => {
+        if (field in req.body) {
+            updated[field] = req.body[field];
+        }
+    });
+
+    User
+        .findById(req.params.id)
+        .then(userToUpdate => {
+            for (field in updated) {
+                userToUpdate[field] = req.body[field];
+            }
+            userToUpdate.save();
+            return res.status(204).end();
+        })
+});
+
+router.post('/', (req, res) => {
     // Register a new user
 
     // Check to make sure all required fields are present
@@ -130,5 +163,4 @@ router.post('/', jsonParser, (req, res) => {
             res.status(500).json({code: 500, message: 'Internal server error'})
         });
 });
-
 module.exports = router;

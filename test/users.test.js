@@ -4,9 +4,10 @@ const chai = require('chai');
 const chaiHttp = require('chai-http');
 const faker = require('faker');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 
 const {app, runServer, closeServer} = require('../server');
-const {TEST_DATABASE_URL} = require('../config');
+const {TEST_DATABASE_URL, JWT_SECRET} = require('../config');
 const {User} = require('../users/models');
 
 const expect = chai.expect;
@@ -317,6 +318,206 @@ describe('users API', () => {
     });
 
     describe('PUT endpoint', () => {
+        const email = 'user@example.com';
+        const password = 'passtest123';
+        const firstName = 'Testy';
+        const lastName = 'Testman';
+        // user.id is generated from mongodb _id, so needs to be reset with each instance
+        let userID;
+
+        // create valid user to update
+        beforeEach(function () {
+            return User.hashPassword(password).then(password =>
+                User.create({email,firstName,lastName,password}))
+                .then(user => userID = user.id);
+        });
+
+        describe('auth checks', () => {
+            it('should reject anonymous requests', () => {
+                const updatedUser = {email: 'shouldNotBeHere@example.com'};
+                return chai.request(app)
+                    .put(`/api/users/${userID}`)
+                    .send(updatedUser)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                        return User.findById(userID)
+                    })
+                    .then(user => expect(user.email).to.equal(email));
+            });
+
+            it('Should reject requests with an invalid token', function() {
+                const updatedUser = {email: 'shouldNotBeHere@example.com'};
+                const token = jwt.sign(
+                    {
+                        email,
+                        firstName,
+                        lastName,
+                        admin: false,
+                        editor: false,
+                        id: userID
+                    },
+                    'wrongSecret',
+                    {
+                        algorithm: 'HS256',
+                        expiresIn: '7d'
+                    }
+                );
+
+                return chai
+                    .request(app)
+                    .put(`/api/users/${userID}`)
+                    .send(updatedUser)
+                    .set('Authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                        return User.findById(userID)
+                    })
+                    .then(user => expect(user.email).to.equal(email));
+            });
+
+            it('Should reject requests with an expired token', function() {
+                const updatedUser = {email: 'shouldNotBeHere@example.com'};
+                const token = jwt.sign(
+                    {
+                        user: {
+                            email,
+                            firstName,
+                            lastName,
+                            admin: false,
+                            editor: false,
+                            id: userID
+                        },
+                        exp: Math.floor(Date.now() / 1000) - 10 // Expired ten seconds ago
+                    },
+                    JWT_SECRET,
+                    {
+                        algorithm: 'HS256',
+                        subject: email
+                    }
+                );
+
+                return chai
+                    .request(app)
+                    .put(`/api/users/${userID}`)
+                    .send(updatedUser)
+                    .set('authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                        return User.findById(userID)
+                    })
+                    .then(user => expect(user.email).to.equal(email));
+            });
+
+            it('should reject requests from non-admin users', () => {
+                const updatedUser = {email: 'shouldNotBeHere@example.com'};
+                const token = jwt.sign(
+                    {
+                        user: {
+                            email,
+                            firstName,
+                            lastName,
+                            admin: false,
+                            editor: false,
+                            id: userID
+                        }
+                    },
+                    JWT_SECRET,
+                    {
+                        algorithm: 'HS256',
+                        subject: email,
+                        expiresIn: '7d'
+                    }
+                );
+
+                return chai.request(app)
+                    .put(`/api/users/${userID}`)
+                    .send(updatedUser)
+                    .set('authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                        return User.findById(userID)
+                    })
+                    .then(user => expect(user.email).to.equal(email));
+            })
+        });
+
+        describe('admin can update user', () => {
+            const adminEmail = 'admin@example.com';
+            const adminFirst = 'Adam';
+            const adminLast = 'Administratorman';
+            const adminPassword = 'adminpassword';
+            let adminID;
+            let token;
+
+            const email = 'user@example.com';
+            const userPassword = 'passtest123';
+            const firstName = 'Testy';
+            const lastName = 'Testman';
+            let userID;
+
+            beforeEach(function () {
+                return User.hashPassword(adminPassword)
+                    .then(hashedAdminPassword =>
+                        // create admin
+                        User.create({
+                            email: adminEmail,
+                            firstName: adminFirst,
+                            lastName: adminLast,
+                            password: hashedAdminPassword,
+                            admin: true
+                        })
+                    )
+                    .then(user => {
+                        adminID = user.id;
+                        token = jwt.sign(
+                            {
+                                user: {
+                                    email: adminEmail,
+                                    firstName: adminFirst,
+                                    lastName: adminLast,
+                                    admin: true,
+                                    editor: false,
+                                    id: adminID
+                                }
+                            },
+                            JWT_SECRET,
+                            {
+                                algorithm: 'HS256',
+                                subject: adminEmail,
+                                expiresIn: '7d'
+                            }
+                        );
+                        // create valid user to update
+                        return User.hashPassword(userPassword)
+                    }).then(hashedUserPassword =>
+                        User.create({email,firstName,lastName,password: hashedUserPassword}))
+                    .then(user => userID = user.id);
+            });
+
+            it('should update user info', () => {
+                const updatedUser = {
+                    email: 'newemail@example.com',
+                    firstName: 'Changed',
+                    lastName: 'New Last Name',
+                    editor: true
+                };
+
+                return chai.request(app)
+                    .put(`/api/users/${userID}`)
+                    .send(updatedUser)
+                    .set('authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(204);
+                        return User.findById(userID)
+                    })
+                    .then(user => {
+                        const updatedFields = ['email', 'firstName', 'lastName', 'editor'];
+                        updatedFields.forEach(field => {
+                            expect(user[field]).to.equal(updatedUser[field])
+                        })
+                    })
+            })
+        });
 
     });
 
