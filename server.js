@@ -15,7 +15,7 @@ mongoose.Promise = global.Promise;
 const PORT = process.env.PORT || 3000;
 
 const {CLIENT_ORIGIN, DATABASE_URL} = require('./config');
-const {localStrategy} = require('./auth/strategies');
+const {localStrategy, jwtStrategy} = require('./auth/strategies');
 
 const app = express();
 
@@ -28,6 +28,7 @@ app.use(
 );
 
 passport.use(localStrategy);
+passport.use(jwtStrategy);
 
 app.use('/api/users', userRouter);
 app.use('/api/auth', authRouter);

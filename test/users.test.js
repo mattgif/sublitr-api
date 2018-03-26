@@ -316,4 +316,8 @@ describe('users API', () => {
         })
     });
 
+    describe('PUT endpoint', () => {
+
+    });
+
 });
