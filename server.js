@@ -1,3 +1,6 @@
+'user strict';
+
+require('dotenv').config();
 const express = require('express');
 const passport = require('passport');
 const cors = require('cors');
@@ -13,7 +16,6 @@ const {DATABASE_URL} = require('./config');
 const mongoose = require('mongoose');
 
 mongoose.Promise = global.Promise;
-mongoose.connect(DATABASE_URL);
 
 const app = express();
 
@@ -37,7 +39,6 @@ app.get('*', (req, res) => {
 
 let server;
 function runServer(databaseUrl = DATABASE_URL, port = PORT) {
-
     return new Promise((resolve, reject) => {
         mongoose.connect(databaseUrl, err => {
             if (err) {
