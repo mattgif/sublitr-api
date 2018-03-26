@@ -2,6 +2,7 @@
 
 const chai = require('chai');
 const chaiHttp = require('chai-http');
+const mongoose = require('mongoose');
 
 const {app, runServer, closeServer} = require('../server');
 const {TEST_DATABASE_URL, JWT_SECRET} = require('../config');
@@ -10,6 +11,11 @@ const {User} = require('../users/models');
 const expect = chai.expect;
 chai.use(chaiHttp);
 
+// tear down for afterEach block
+function tearDownDb() {
+    return mongoose.connection.dropDatabase();
+}
+
 describe('Auth endpoints', () => {
     const email = 'user@example.com';
     const password = 'passtest123';
@@ -17,24 +23,20 @@ describe('Auth endpoints', () => {
     const lastName = 'Testman';
 
     before(function () {
-        runServer(TEST_DATABASE_URL)
+        return runServer(TEST_DATABASE_URL)
     });
 
     beforeEach(function () {
-        return User.hashPassword(password)
-            .then(password => User.create({email,firstName,lastName,password}))
+        return User.hashPassword(password).then(password =>
+            User.create({email,firstName,lastName,password}))
     });
 
     afterEach(function () {
-        return User.remove({});
+        return tearDownDb();
     });
 
     after(function () {
-        closeServer()
-    });
-
-    it('should pass no matter what', () => {
-        expect(true).to.equal(true)
+        return closeServer()
     });
 
     it.skip('should reject a login with no credentials', () => {
@@ -42,12 +44,11 @@ describe('Auth endpoints', () => {
             .then(res => expect(res).to.have.status(400))
     });
 
-    it.skip('should return a valid auth token', () => {
+    it('should return a valid auth token', () => {
         return chai.request(app)
             .post('/api/auth/login')
-            .send({email: email, password: password})
+            .send({email, password})
             .then(res => {
-                console.log(res);
                 expect(res).to.have.status(200);
                 expect(res).to.be.an('object');
                 const token = res.body.authToken;

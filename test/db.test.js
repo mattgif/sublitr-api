@@ -1,7 +1,7 @@
 const chai = require('chai');
 const mongoose = require('mongoose');
 
-const {app, runServer, closeServer} = require('../server');
+const {runServer, closeServer} = require('../server');
 const {TEST_DATABASE_URL} = require('../config');
 const {User} = require('../users/models');
 

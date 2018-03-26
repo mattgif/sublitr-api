@@ -1,23 +1,37 @@
 'use strict';
-
-const LocalStrategy = require('passport-local').Strategy;
+const {Strategy: LocalStrategy} = require('passport-local');
 
 const {User} = require('../users/models');
 
-const localStrategy = new LocalStrategy((email, password, done) => {
-    User.findOne({ email: email }, function (err, user) {
-        if (err) { return done(err); }
-        if (!user) {
-            console.log('bad user');
-            return done(null, false, { message: 'Incorrect username.' });
-        }
-        if (!user.validatePassword(password)) {
-            console.log('bad pass');
-            return done(null, false, { message: 'Incorrect password.' });
-        }
-        console.log('goody good good')
-        return done(null, user);
-    });
+const localStrategy = new LocalStrategy((email, password, callback) => {
+    let user;
+    User.findOne({ email: email })
+        .then(_user => {
+            user = _user;
+            if (!user) {
+                return Promise.reject({
+                    reason: 'LoginError',
+                    message: 'Incorrect email or password'
+                })
+            }
+            return user.validatePassword(password)
+        })
+        .then(isValid => {
+            if (!isValid) {
+                return Promise.reject({
+                    reason: 'LoginError',
+                    message: 'Incorrect email or password'
+                })
+            }
+            return callback(null, user);
+        })
+        .catch(err => {
+            if (err.reason === 'LoginError') {
+                return callback(null, false, err)
+            }
+            return callback(err, false);
+        })
 });
+
 
 module.exports = localStrategy;

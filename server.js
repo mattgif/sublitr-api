@@ -2,12 +2,10 @@
 
 require('dotenv').config();
 const express = require('express');
-const passport = require('passport');
 const cors = require('cors');
 const morgan = require('morgan');
 
 const userRouter = require('./users/router');
-const localStrategy = require('./auth/strategies');
 const authRouter = require('./auth/router');
 const PORT = process.env.PORT || 3000;
 
@@ -19,15 +17,13 @@ mongoose.Promise = global.Promise;
 
 const app = express();
 
-// app.use(morgan('common'));
+app.use(morgan('common'));
 
 app.use(
     cors({
         origin: CLIENT_ORIGIN
     })
 );
-
-passport.use(localStrategy);
 
 app.use('/api/users', userRouter);
 app.use('/api/auth', authRouter);
