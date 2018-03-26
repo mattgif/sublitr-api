@@ -4,16 +4,18 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const passport = require('passport');
+const mongoose = require('mongoose');
 
 const userRouter = require('./users/router');
 const authRouter = require('./auth/router');
-const PORT = process.env.PORT || 3000;
-
-const {CLIENT_ORIGIN} = require('./config');
-const {DATABASE_URL} = require('./config');
-const mongoose = require('mongoose');
 
 mongoose.Promise = global.Promise;
+
+const PORT = process.env.PORT || 3000;
+
+const {CLIENT_ORIGIN, DATABASE_URL} = require('./config');
+const {localStrategy} = require('./auth/strategies');
 
 const app = express();
 
@@ -25,13 +27,14 @@ app.use(
     })
 );
 
+passport.use(localStrategy);
+
 app.use('/api/users', userRouter);
 app.use('/api/auth', authRouter);
 
 app.get('*', (req, res) => {
    res.status(404).json({message: 'endpoint not found'});
 });
-
 
 let server;
 function runServer(databaseUrl = DATABASE_URL, port = PORT) {

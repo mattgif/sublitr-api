@@ -3,6 +3,7 @@
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 
 const {app, runServer, closeServer} = require('../server');
 const {TEST_DATABASE_URL, JWT_SECRET} = require('../config');
@@ -56,12 +57,14 @@ describe('Auth endpoints', () => {
                 const payload = jwt.verify(token, JWT_SECRET, {
                     algorithm: ['HS256']
                 });
+                const id = payload.user.id;
                 expect(payload.user).to.deep.equal({
                     email,
                     firstName,
                     lastName,
                     editor: false,
-                    admin: false
+                    admin: false,
+                    id
                 })
             })
     })
