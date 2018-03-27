@@ -485,7 +485,7 @@ describe('users API', () => {
                     JWT_SECRET,
                     {
                         algorithm: 'HS256',
-                            subject: adminEmail,
+                        subject: adminEmail,
                         expiresIn: '7d'
                     }
                 );
@@ -843,6 +843,158 @@ describe('users API', () => {
                     expect(res.body.lastName).to.equal(lastName);
                     expect(res.body.id).to.equal(userID);
                     expect(res.body.admin).to.be.false;
+                })
+        });
+    });
+
+    describe('GET endpoint for all users', () => {
+        const email = 'user@example.com';
+        const firstName = 'Testy';
+        const lastName = 'Testman';
+        const userID = 'aaaaaaaaa';
+
+        function seedDb() {
+            let fakeUsers = [];
+            for (let i=0; i<10; i++) {
+                fakeUsers.push({
+                    email: faker.internet.email(),
+                    firstName: faker.name.firstName(),
+                    lastName: faker.name.lastName(),
+                    password: faker.internet.password(),
+                    editor: Math.random() < .5
+                })
+            }
+            User.insert(fakeUsers);
+        }
+        // create valid user to update
+        beforeEach(function () {
+            seedDb();
+        });
+
+        describe('auth checks', () => {
+            it('should reject anonymous requests', () => {
+                return chai.request(app)
+                    .get(`/api/users/`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                    })
+            });
+
+            it('Should reject requests with an invalid token', () => {
+                const token = jwt.sign(
+                    {
+                        email: email,
+                        firstName: firstName,
+                        lastName: lastName,
+                        admin: false,
+                        editor: false,
+                        id: userID
+                    },
+                    'wrongSecret',
+                    {
+                        algorithm: 'HS256',
+                        expiresIn: '7d'
+                    }
+                );
+
+                return chai
+                    .request(app)
+                    .get(`/api/users/`)
+                    .set('authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                    })
+            });
+
+            it('Should reject requests with an expired token', () => {
+                const token = jwt.sign(
+                    {
+                        user: {
+                            email,
+                            firstName,
+                            lastName,
+                            admin: false,
+                            editor: false,
+                            id: userID
+                        },
+                        exp: Math.floor(Date.now() / 1000) - 10 // Expired ten seconds ago
+                    },
+                    JWT_SECRET,
+                    {
+                        algorithm: 'HS256',
+                        subject: email
+                    }
+                );
+
+                return chai
+                    .request(app)
+                    .get(`/api/users/`)
+                    .set('authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                    })
+            });
+
+            it('should reject requests from non-admin users', () => {
+                const token = jwt.sign(
+                    {
+                        user: {
+                            email,
+                            firstName,
+                            lastName,
+                            admin: false,
+                            editor: false,
+                            id: userID
+                        }
+                    },
+                    JWT_SECRET,
+                    {
+                        algorithm: 'HS256',
+                        subject: email,
+                        expiresIn: '7d'
+                    }
+                );
+
+                return chai.request(app)
+                    .get(`/api/users/`)
+                    .set('authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                    })
+            })
+        });
+
+        it('should return list of all users if requester is admin', () => {
+            const adminEmail = 'admin@example.com';
+            const adminFirst = 'Adam';
+            const adminLast = 'Administratorman';
+
+            const token = jwt.sign(
+                {
+                    user: {
+                        email: adminEmail,
+                        firstName: adminFirst,
+                        lastName: adminLast,
+                        admin: true,
+                        editor: false,
+                        id: 'whatever'
+                    }
+                },
+                JWT_SECRET,
+                {
+                    algorithm: 'HS256',
+                    subject: email,
+                    expiresIn: '7d'
+                }
+            );
+
+            return chai.request(app)
+                .get(`/api/users/`)
+                .set('authorization', `Bearer ${token}`)
+                .then(res => {
+                    expect(res).to.have.status(200);
+                    expect(res).to.be.json;
+                    expect(res.body).to.be.an('array');
                 })
         });
     });
