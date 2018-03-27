@@ -864,7 +864,7 @@ describe('users API', () => {
                     editor: Math.random() < .5
                 })
             }
-            User.insert(fakeUsers);
+            return User.insertMany(fakeUsers);
         }
         // create valid user to update
         beforeEach(function () {

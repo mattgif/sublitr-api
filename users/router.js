@@ -10,8 +10,21 @@ const jwtAuth = passport.authenticate('jwt', {session: false});
 
 router.use(jsonParser);
 
-router.get('/', (req, res) => {
-    res.status(200).json({ok: true})
+router.get('/', jwtAuth, (req, res) => {
+    // check for admin privileges
+    if (!req.user.admin) {
+        return res.status(401).json({
+            code: 401,
+            reason: 'AuthenticationError',
+            message: 'Not admin'
+        })
+    }
+
+    User.find()
+        .then(users => {
+            serializedUsers = users.map(user => user.serialize());
+            res.status(200).json(serializedUsers)
+        })
 });
 
 router.get('/:id', jwtAuth, (req, res) => {
