@@ -19,7 +19,7 @@ const {localStrategy, jwtStrategy} = require('./auth/strategies');
 
 const app = express();
 
-app.use(morgan('common'));
+// app.use(morgan('common'));
 
 app.use(
     cors({

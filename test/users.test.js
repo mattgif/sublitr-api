@@ -345,7 +345,7 @@ describe('users API', () => {
                     .then(user => expect(user.email).to.equal(email));
             });
 
-            it('Should reject requests with an invalid token', function() {
+            it('Should reject requests with an invalid token', () => {
                 const updatedUser = {email: 'shouldNotBeHere@example.com'};
                 const token = jwt.sign(
                     {
@@ -375,7 +375,7 @@ describe('users API', () => {
                     .then(user => expect(user.email).to.equal(email));
             });
 
-            it('Should reject requests with an expired token', function() {
+            it('Should reject requests with an expired token', () => {
                 const updatedUser = {email: 'shouldNotBeHere@example.com'};
                 const token = jwt.sign(
                     {
@@ -442,6 +442,10 @@ describe('users API', () => {
         });
 
         describe('admin can update user', () => {
+            // strategy: create admin account, create non-admin user account
+            // send put request to endpoint/userID with admin credentials & updated payload
+            // check for correct response code
+            // check db to make sure change was made
             const adminEmail = 'admin@example.com';
             const adminFirst = 'Adam';
             const adminLast = 'Administratorman';
@@ -521,4 +525,178 @@ describe('users API', () => {
 
     });
 
+    describe('DELETE endpoint', () => {
+        const email = 'user@example.com';
+        const userPassword = 'passtest123';
+        const firstName = 'Testy';
+        const lastName = 'Testman';
+        let userID;
+
+        beforeEach(function () {
+            return User
+                .hashPassword(userPassword)
+                .then(password => {
+                    return User.create({
+                        email,
+                        password,
+                        firstName,
+                        lastName
+                    })
+                })
+                .then(user => userID = user.id)
+        });
+
+        describe('auth checks', () => {
+            it('should reject anonymous requests', () => {
+                return chai.request(app)
+                    .delete(`/api/users/${userID}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                        return User.findById(userID)
+                    })
+                    .then(user => expect(user).to.exist);
+            });
+
+            it('Should reject requests with an invalid token', () => {
+                const token = jwt.sign(
+                    {
+                        email,
+                        firstName,
+                        lastName,
+                        admin: false,
+                        editor: false,
+                        id: userID
+                    },
+                    'wrongSecret',
+                    {
+                        algorithm: 'HS256',
+                        expiresIn: '7d'
+                    }
+                );
+
+                return chai
+                    .request(app)
+                    .delete(`/api/users/${userID}`)
+                    .set('Authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                        return User.findById(userID)
+                    })
+                    .then(user => expect(user).to.exist);
+            });
+
+            it('Should reject requests with an expired token', () => {
+                const token = jwt.sign(
+                    {
+                        user: {
+                            email,
+                            firstName,
+                            lastName,
+                            admin: false,
+                            editor: false,
+                            id: userID
+                        },
+                        exp: Math.floor(Date.now() / 1000) - 10 // Expired ten seconds ago
+                    },
+                    JWT_SECRET,
+                    {
+                        algorithm: 'HS256',
+                        subject: email
+                    }
+                );
+
+                return chai
+                    .request(app)
+                    .delete(`/api/users/${userID}`)
+                    .set('authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                        return User.findById(userID)
+                    })
+                    .then(user => expect(user).to.exist);
+            });
+
+            it('should reject requests from non-self non-admin users', () => {
+                const token = jwt.sign(
+                    {
+                        user: {
+                            email,
+                            firstName,
+                            lastName,
+                            admin: false,
+                            editor: false,
+                            id: 'adifferentpersonsid'
+                        }
+                    },
+                    JWT_SECRET,
+                    {
+                        algorithm: 'HS256',
+                        subject: email,
+                        expiresIn: '7d'
+                    }
+                );
+
+                return chai.request(app)
+                    .delete(`/api/users/${userID}`)
+                    .set('authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                        return User.findById(userID)
+                    })
+                    .then(user => expect(user.email).to.exist);
+            })
+        });
+
+        it('should delete the account', () => {
+            const adminEmail = 'admin@example.com';
+            const adminFirst = 'Adam';
+            const adminLast = 'Administratorman';
+            const adminPassword = 'adminpassword';
+            let adminID;
+            let token;
+
+            return User.hashPassword(adminPassword)
+                .then(hashedAdminPassword =>
+                    // create admin
+                    User.create({
+                        email: adminEmail,
+                        firstName: adminFirst,
+                        lastName: adminLast,
+                        password: hashedAdminPassword,
+                        admin: true
+                    })
+                )
+                .then(user => {
+                    adminID = user.id;
+                    token = jwt.sign(
+                        {
+                            user: {
+                                email: adminEmail,
+                                firstName: adminFirst,
+                                lastName: adminLast,
+                                admin: true,
+                                editor: false,
+                                id: adminID
+                            }
+                        },
+                        JWT_SECRET,
+                        {
+                            algorithm: 'HS256',
+                            subject: adminEmail,
+                            expiresIn: '7d'
+                        }
+                    );
+                    return chai.request(app)
+                        .delete(`/api/users/${userID}`)
+                        .set('authorization', `Bearer ${token}`)
+                })
+                .then(res => {
+                    expect(res).to.have.status(204);
+                    return User.findById(userID).count()
+                })
+                .then(count => {
+                    expect(count).to.equal(0)
+                })
+        });
+    });
 });

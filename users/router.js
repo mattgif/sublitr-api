@@ -14,35 +14,6 @@ router.get('/', (req, res) => {
     res.status(200).json({ok: true})
 });
 
-router.put('/:id', jwtAuth, (req, res) => {
-    // check for admin privileges
-    if (!req.user.admin) {
-        return res.status(401).json({
-            code: 401,
-            reason: 'AuthenticationError',
-            message: 'Not admin'
-        })
-    }
-
-    const updated = {};
-    const topLevelFields = ['firstName', 'lastName', 'email', 'admin', 'editor'];
-    topLevelFields.forEach(field => {
-        if (field in req.body) {
-            updated[field] = req.body[field];
-        }
-    });
-
-    User
-        .findById(req.params.id)
-        .then(userToUpdate => {
-            for (field in updated) {
-                userToUpdate[field] = req.body[field];
-            }
-            userToUpdate.save();
-            return res.status(204).end();
-        })
-});
-
 router.post('/', (req, res) => {
     // Register a new user
 
@@ -163,4 +134,54 @@ router.post('/', (req, res) => {
             res.status(500).json({code: 500, message: 'Internal server error'})
         });
 });
+
+router.put('/:id', jwtAuth, (req, res) => {
+    // check for admin privileges
+    if (!req.user.admin) {
+        return res.status(401).json({
+            code: 401,
+            reason: 'AuthenticationError',
+            message: 'Not admin'
+        })
+    }
+
+    const updated = {};
+    const topLevelFields = ['firstName', 'lastName', 'email', 'admin', 'editor'];
+    topLevelFields.forEach(field => {
+        if (field in req.body) {
+            updated[field] = req.body[field];
+        }
+    });
+
+    User
+        .findById(req.params.id)
+        .then(userToUpdate => {
+            for (field in updated) {
+                userToUpdate[field] = req.body[field];
+            }
+            userToUpdate.save();
+            return res.status(204).end();
+        })
+});
+
+router.delete('/:id', jwtAuth, (req, res) => {
+    if ((!(req.user.id === req.params.id) && !req.user.admin)) {
+        // user is a valid user, but neither an admin, nor the user they're trying to delete
+        return res.status(401).json({
+            code: 401,
+            reason: 'AuthenticationError',
+            message: 'Not authorized to delete account'
+        })
+    }
+
+    User.findById(req.params.id)
+        .then(user => {
+            user.remove()
+        })
+        .then(() => {
+            console.log(`Deleted user with id ${req.params.id}`);
+            res.status(204).end()
+        })
+});
+
 module.exports = router;
