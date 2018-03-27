@@ -14,6 +14,21 @@ router.get('/', (req, res) => {
     res.status(200).json({ok: true})
 });
 
+router.get('/:id', jwtAuth, (req, res) => {
+    if (!((req.user.id === req.params.id) || req.user.admin)) {
+        // user is a valid user, but neither an admin, nor the user they're trying to delete
+        return res.status(401).json({
+            code: 401,
+            reason: 'AuthenticationError',
+            message: 'Not authorized to view account'
+        })
+    }
+
+    User.findById(req.params.id).then(user => {
+        res.status(200).json(user.serialize())
+    })
+});
+
 router.post('/', (req, res) => {
     // Register a new user
 
@@ -165,7 +180,7 @@ router.put('/:id', jwtAuth, (req, res) => {
 });
 
 router.delete('/:id', jwtAuth, (req, res) => {
-    if ((!(req.user.id === req.params.id) && !req.user.admin)) {
+    if (!((req.user.id === req.params.id) || req.user.admin)) {
         // user is a valid user, but neither an admin, nor the user they're trying to delete
         return res.status(401).json({
             code: 401,
