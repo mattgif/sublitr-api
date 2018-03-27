@@ -699,4 +699,113 @@ describe('users API', () => {
                 })
         });
     });
+
+    describe('GET endpoint for specfic user', () => {
+        const email = 'user@example.com';
+        const password = 'passtest123';
+        const firstName = 'Testy';
+        const lastName = 'Testman';
+        // user.id is generated from mongodb _id, so needs to be reset with each instance
+        let userID;
+
+        // create valid user to update
+        beforeEach(function () {
+            return User.hashPassword(password).then(password =>
+                User.create({email,firstName,lastName,password}))
+                .then(user => userID = user.id);
+        });
+
+        describe('auth checks', () => {
+            it('should reject anonymous requests', () => {
+                return chai.request(app)
+                    .get(`/api/users/${userID}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                    })
+            });
+
+            it('Should reject requests with an invalid token', () => {
+                const token = jwt.sign(
+                    {
+                        email: email,
+                        firstName: firstName,
+                        lastName: lastName,
+                        admin: false,
+                        editor: false,
+                        id: userID
+                    },
+                    'wrongSecret',
+                    {
+                        algorithm: 'HS256',
+                        expiresIn: '7d'
+                    }
+                );
+
+                return chai
+                    .request(app)
+                    .get(`/api/users/${userID}`)
+                    .set('authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                    })
+            });
+
+            it('Should reject requests with an expired token', () => {
+                const token = jwt.sign(
+                    {
+                        user: {
+                            email,
+                            firstName,
+                            lastName,
+                            admin: false,
+                            editor: false,
+                            id: userID
+                        },
+                        exp: Math.floor(Date.now() / 1000) - 10 // Expired ten seconds ago
+                    },
+                    JWT_SECRET,
+                    {
+                        algorithm: 'HS256',
+                        subject: email
+                    }
+                );
+
+                return chai
+                    .request(app)
+                    .get(`/api/users/${userID}`)
+                    .set('authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                    })
+            });
+
+            it('should reject requests from non-admin users', () => {
+                const token = jwt.sign(
+                    {
+                        user: {
+                            email,
+                            firstName,
+                            lastName,
+                            admin: false,
+                            editor: false,
+                            id: userID
+                        }
+                    },
+                    JWT_SECRET,
+                    {
+                        algorithm: 'HS256',
+                        subject: email,
+                        expiresIn: '7d'
+                    }
+                );
+
+                return chai.request(app)
+                    .get(`/api/users/${userID}`)
+                    .set('authorization', `Bearer ${token}`)
+                    .then(res => {
+                        expect(res).to.have.status(401);
+                    })
+            })
+        });
+    })
 });
