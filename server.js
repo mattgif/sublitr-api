@@ -9,7 +9,7 @@ const mongoose = require('mongoose');
 
 const userRouter = require('./users/router');
 const authRouter = require('./auth/router');
-const submissionRouter = require('./submissions/router');
+// const submissionRouter = require('./submissions/router');
 
 mongoose.Promise = global.Promise;
 
@@ -33,7 +33,7 @@ passport.use(jwtStrategy);
 
 app.use('/api/users', userRouter);
 app.use('/api/auth', authRouter);
-app.use('/api/submissions', submissionRouter);
+// app.use('/api/submissions', submissionRouter);
 
 app.get('*', (req, res) => {
    res.status(404).json({message: 'endpoint not found'});
