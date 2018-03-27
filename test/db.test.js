@@ -11,7 +11,7 @@ function tearDownDb() {
     return mongoose.connection.dropDatabase();
 }
 
-describe('db connection', () => {
+describe('User collection in db', () => {
     const email = 'user@example.com';
     const password = 'passtest123';
     const firstName = 'Testy';

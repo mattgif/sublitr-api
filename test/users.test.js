@@ -50,7 +50,7 @@ describe('users API', () => {
     });
 
     afterEach(function() {
-        return tearDownDb();
+        return User.remove({})
     });
 
     after(function() {
@@ -465,22 +465,6 @@ describe('users API', () => {
             // send put request to endpoint/userID with admin credentials & updated payload
             // check for correct response code
             // check db to make sure change was made
-            const email = 'user@example.com';
-            const userPassword = 'passtest123';
-            const firstName = 'Testy';
-            const lastName = 'Testman';
-            let userID;
-
-            beforeEach(function () {
-                // create valid user to update
-                return User.hashPassword(userPassword)
-                    .then(hashedUserPassword =>
-                        User.create(
-                            {email,firstName,lastName,password: hashedUserPassword}
-                        ))
-                    .then(user => userID = user.id);
-            });
-
             it('should update user info', () => {
                 const adminEmail = 'testAdmin@example.com';
                 const updatedUser = {
@@ -867,6 +851,10 @@ describe('users API', () => {
     });
 
     describe('GET endpoint for all users', () => {
+        beforeEach(function() {
+            seedDb();
+        });
+
         const email = 'user@example.com';
         const firstName = 'Testy';
         const lastName = 'Testman';
@@ -988,12 +976,9 @@ describe('users API', () => {
                     expiresIn: '7d'
                 }
             );
-
-            seedDb().then(
-                chai.request(app)
-                    .get(`/api/users/`)
-                    .set('authorization', `Bearer ${token}`)
-            )
+            return chai.request(app)
+                .get(`/api/users/`)
+                .set('authorization', `Bearer ${token}`)
                 .then(res => {
                     expect(res).to.have.status(200);
                     expect(res).to.be.json;

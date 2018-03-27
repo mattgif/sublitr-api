@@ -22,9 +22,10 @@ router.get('/', jwtAuth, (req, res) => {
 
     User.find({})
         .then(users => {
-            serializedUsers = users.map(user => user.serialize());
+            const serializedUsers = users.map(user => user.serialize());
             res.status(200).json(serializedUsers)
         })
+        .catch(console.error)
 });
 
 router.get('/:id', jwtAuth, (req, res) => {
