@@ -13,6 +13,8 @@ const {User} = require('../users/models');
 const expect = chai.expect;
 chai.use(chaiHttp);
 
+const NUM_FAKE_USERS = 10;
+
 // used to generate an object representing a new user
 function generateNewUser() {
     return {
@@ -26,6 +28,20 @@ function generateNewUser() {
 // tear down for afterEach block
 function tearDownDb() {
     return mongoose.connection.dropDatabase();
+}
+
+function seedDb() {
+    let fakeUsers = [];
+    for (let i=0; i<NUM_FAKE_USERS; i++) {
+        fakeUsers.push({
+            email: faker.internet.email(),
+            firstName: faker.name.firstName(),
+            lastName: faker.name.lastName(),
+            password: faker.internet.password(),
+            editor: Math.random() < .5
+        })
+    }
+    return User.insertMany(fakeUsers);
 }
 
 describe('users API', () => {
@@ -318,6 +334,9 @@ describe('users API', () => {
     });
 
     describe('PUT endpoint', () => {
+        // afterEach(function() {
+        //     return tearDownDb();
+        // });
         const email = 'user@example.com';
         const password = 'passtest123';
         const firstName = 'Testy';
@@ -853,24 +872,6 @@ describe('users API', () => {
         const lastName = 'Testman';
         const userID = 'aaaaaaaaa';
 
-        function seedDb() {
-            let fakeUsers = [];
-            for (let i=0; i<10; i++) {
-                fakeUsers.push({
-                    email: faker.internet.email(),
-                    firstName: faker.name.firstName(),
-                    lastName: faker.name.lastName(),
-                    password: faker.internet.password(),
-                    editor: Math.random() < .5
-                })
-            }
-            return User.insertMany(fakeUsers);
-        }
-        // create valid user to update
-        beforeEach(function () {
-            seedDb();
-        });
-
         describe('auth checks', () => {
             it('should reject anonymous requests', () => {
                 return chai.request(app)
@@ -988,13 +989,20 @@ describe('users API', () => {
                 }
             );
 
-            return chai.request(app)
-                .get(`/api/users/`)
-                .set('authorization', `Bearer ${token}`)
+            seedDb().then(
+                chai.request(app)
+                    .get(`/api/users/`)
+                    .set('authorization', `Bearer ${token}`)
+            )
                 .then(res => {
                     expect(res).to.have.status(200);
                     expect(res).to.be.json;
                     expect(res.body).to.be.an('array');
+                    expect(res.body).to.have.lengthOf(NUM_FAKE_USERS);
+                    ['email', 'firstName', 'lastName', 'admin', 'editor'].forEach(field => {
+                        expect(field in res.body[0]).to.be.true;
+                    });
+                    expect('password' in res.body[0]).to.be.false;
                 })
         });
     });
