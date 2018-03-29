@@ -42,7 +42,11 @@ const SubmissionSchema = new mongoose.Schema({
             required: true,
             default: 'none'
         },
-        lastAction: Date,
+        lastAction: {
+            type: Date,
+            required: true,
+            default: Date.now()
+        },
         comments: [{
             name: String,
             authorID: String,
@@ -52,6 +56,25 @@ const SubmissionSchema = new mongoose.Schema({
     }
 
 });
+
+SubmissionSchema.methods.serialize = function(editor) {
+    const submission = {
+        id: this._id,
+        title: this.title,
+        author: this.author,
+        authorID: this.authorID,
+        submitted: this.submitted,
+        status: this.status,
+        publication: this.publication,
+    };
+
+    if (editor) {
+        submission.file = this.file;
+        submission.reviewerInfo = this.reviewerInfo;
+    }
+
+    return submission;
+};
 
 const Submission = mongoose.model('Submission', SubmissionSchema);
 
