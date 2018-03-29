@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+// TODO: coverletter
 const SubmissionSchema = new mongoose.Schema({
     title: {
         type: String,

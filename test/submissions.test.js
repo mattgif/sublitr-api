@@ -389,6 +389,126 @@ describe('submissions API', () => {
             })
         });
 
+        it('should reject a submission with a missing title', () => {
+            const missingTitle = {
+                publication: faker.random.words(),
+                file: faker.system.commonFileName(),
+            };
+
+            return chai.request(app)
+                .post('/api/submissions')
+                .send(missingTitle)
+                .set('authorization', `Bearer ${userToken}`)
+                .then(res => {
+                    expect(res).to.have.status(422);
+                    expect(res).to.be.json;
+                    expect(res.body.reason).to.equal('ValidationError');
+                    expect(res.body.message).to.equal('Missing field');
+                    expect(res.body.location).to.equal('title');
+                })
+        });
+
+        it('should reject a submission with a missing publication', () => {
+            const missingPub = {
+                title: faker.lorem.words(),
+                file: faker.system.commonFileName(),
+            };
+
+            return chai.request(app)
+                .post('/api/submissions')
+                .send(missingPub)
+                .set('authorization', `Bearer ${userToken}`)
+                .then(res => {
+                    expect(res).to.have.status(422);
+                    expect(res).to.be.json;
+                    expect(res.body.reason).to.equal('ValidationError');
+                    expect(res.body.message).to.equal('Missing field');
+                    expect(res.body.location).to.equal('publication');
+                })
+        });
+
+        // TODO: file, cover letter
+
+        it('should reject a submission with non string publication', () => {
+            const nonStringPub = {
+                title: faker.lorem.words(),
+                publication: 11,
+                file: faker.system.commonFileName(),
+            };
+
+            return chai.request(app)
+                .post('/api/submissions')
+                .send(nonStringPub)
+                .set('authorization', `Bearer ${userToken}`)
+                .then(res => {
+                    expect(res).to.have.status(422);
+                    expect(res).to.be.json;
+                    expect(res.body.reason).to.equal('ValidationError');
+                    expect(res.body.message).to.equal('publication must be a string');
+                    expect(res.body.location).to.equal('publication');
+                })
+        });
+
+        it('should reject a submission with non string title', () => {
+            const nonStringTitle = {
+                title: 325,
+                publication: faker.lorem.words(),
+                file: faker.system.commonFileName(),
+            };
+
+            return chai.request(app)
+                .post('/api/submissions')
+                .send(nonStringTitle)
+                .set('authorization', `Bearer ${userToken}`)
+                .then(res => {
+                    expect(res).to.have.status(422);
+                    expect(res).to.be.json;
+                    expect(res.body.reason).to.equal('ValidationError');
+                    expect(res.body.message).to.equal('title must be a string');
+                    expect(res.body.location).to.equal('title');
+                })
+        });
+
+        it('should reject a submission with an overly long title', () => {
+            const tooLongTitle = {
+                title: Array(129).fill('a').join(''),
+                publication: faker.lorem.words(),
+                file: faker.system.commonFileName(),
+            };
+
+            return chai.request(app)
+                .post('/api/submissions')
+                .send(tooLongTitle)
+                .set('authorization', `Bearer ${userToken}`)
+                .then(res => {
+                    expect(res).to.have.status(422);
+                    expect(res).to.be.json;
+                    expect(res.body.reason).to.equal('ValidationError');
+                    expect(res.body.message).to.equal('Can\'t be more than 128 characters long');
+                    expect(res.body.location).to.equal('title');
+                })
+        });
+
+        it('should reject a submission with a pure whitespace title', () => {
+            const whitespaceTitle = {
+                title: '                      ',
+                publication: faker.lorem.words(),
+                file: faker.system.commonFileName(),
+            };
+
+            return chai.request(app)
+                .post('/api/submissions')
+                .send(whitespaceTitle)
+                .set('authorization', `Bearer ${userToken}`)
+                .then(res => {
+                    expect(res).to.have.status(422);
+                    expect(res).to.be.json;
+                    expect(res.body.reason).to.equal('ValidationError');
+                    expect(res.body.message).to.equal(`Must be at least 1 characters long`);
+                    expect(res.body.location).to.equal('title');
+                })
+        });
+
         it('should create a new submission', () => {
             return chai.request(app)
                 .post('/api/submissions')
@@ -396,7 +516,7 @@ describe('submissions API', () => {
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(201);
-                    expect(res.body).to.be.json;
+                    expect(res).to.be.json;
                     expectedFields.forEach(field => { expect(field in res.body).to.be.true });
                     expect(res.body.author).to.equal(`${userFirst} ${userLast}`);
                     expect(res.body.authorID).to.equal(userID);
