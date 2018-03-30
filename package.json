@@ -22,11 +22,13 @@
   },
   "homepage": "https://github.com/mattgif/sublitr-api#readme",
   "dependencies": {
+    "aws-sdk": "^2.217.1",
     "bcrypt": "^1.0.3",
     "body-parser": "^1.18.2",
     "cors": "^2.8.4",
     "dotenv": "^5.0.1",
     "express": "^4.16.3",
+    "express-fileupload": "^0.4.0",
     "jsonwebtoken": "^8.2.0",
     "mongoose": "^5.0.11",
     "morgan": "^1.9.0",

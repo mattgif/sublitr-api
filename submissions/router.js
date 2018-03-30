@@ -1,13 +1,26 @@
 const express = require('express');
 const passport = require('passport');
 const bodyParser = require('body-parser');
+const aws = require('aws-sdk');
+const fileUpload = require('express-fileupload');
+const fs = require('fs');
 
 const {Submission} = require('../submissions/models');
 
 const router = express.Router();
+const { S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = require('../config');
 
 const jsonParser = bodyParser.json();
 const jwtAuth = passport.authenticate('jwt', {session: false});
+const AWS_REGION = 'us-east-2';
+
+aws.config.update({
+    accessKeyId: AWS_ACCESS_KEY_ID,
+    secretAccessKey: AWS_SECRET_ACCESS_KEY,
+    region: AWS_REGION
+});
+
+const s3 = new aws.S3();
 
 router.use(jsonParser);
 router.use(jwtAuth);
@@ -58,9 +71,11 @@ router.get('/:submissionID', (req, res) => {
         })
 });
 
-router.post('/', (req, res) => {
+router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload()], (req, res) => {
+    console.log(req.files.doc);
+
     // Check for missing fields
-    // TODO: file field, cover letter
+    // TODO: file field
     const requiredFields = ['title', 'publication'];
     const missingField = requiredFields.find(field => !(field in req.body));
     if (missingField) {
@@ -73,9 +88,9 @@ router.post('/', (req, res) => {
     }
 
     // Check that each field is the correct type
-    // TODO: file type, cover letter
-    const stringFields = ['title', 'publication'];
-    const nonStringField = stringFields.find(field => !(typeof req.body[field] === 'string'));
+    // TODO: file type
+    const stringFields = ['title', 'publication', 'coverLetter'];
+    const nonStringField = stringFields.find(field => (field in req.body) && !(typeof req.body[field] === 'string'));
     if (nonStringField) {
         return res.status(422).json({
             code: 422,
@@ -85,19 +100,24 @@ router.post('/', (req, res) => {
         })
     }
 
-    // Check that fields are correctly sized
-    // TODO: cover letter
+    // TODO: file size
+
     // Check that fields meet length requirements
     const sizedFields = {
         title: {min: 1, max: 128},
+        coverLetter: {max: 3000}
     };
 
     const tooSmallField = Object.keys(sizedFields).find(field =>
-        'min' in sizedFields[field] && (req.body[field].trim().length < sizedFields[field].min)
+        'min' in sizedFields[field]
+        && field in req.body
+        && (req.body[field].trim().length < sizedFields[field].min)
     );
 
     const tooLargeField = Object.keys(sizedFields).find(field =>
-        'max' in sizedFields[field] && req.body[field].trim().length > sizedFields[field].max
+        'max' in sizedFields[field]
+        && field in req.body
+        && req.body[field].trim().length > sizedFields[field].max
     );
 
     if (tooLargeField || tooSmallField) {
@@ -110,19 +130,63 @@ router.post('/', (req, res) => {
         })
     }
 
-    // TODO: file, cover letter
+    // TODO: file
     Submission
         .create({
             title: req.body.title,
             author: `${req.user.firstName} ${req.user.lastName}`,
             authorID: req.user.id,
             publication: req.body.publication,
+            coverLetter: req.body.coverLetter,
             file: 'REPLACE'
         })
         .then(sub => {
             return res.status(201).json(sub.serialize((req.user.admin || req.user.editor)))
         })
         .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
+});
+
+router.put('/:id', (req, res) => {
+    if (!(req.user.admin || req.user.editor)) {
+        return res.status(401).json({
+            code: 401,
+            reason: 'AuthenticationError',
+            message: `Not authorized to update submission ${req.params.id}`
+        })
+    }
+
+    if (req.params.id !== req.body.id) {
+        return res.status(400).json({
+            code: 400,
+            reason: 'BadRequest',
+            message: 'Submission ID mismatch'
+        })
+    }
+
+    const updateReq = req.body.reviewerInfo;
+    const updatedSubmission = {};
+    const updatableFields = ['decision', 'recommendation'];
+
+    const stringFields = ['decision', 'recommendation'];
+    const nonStringField = stringFields.find(field => (field in updateReq) && !(typeof updateReq[field] === 'string'));
+    if (nonStringField) {
+        return res.status(422).json({
+            code: 422,
+            reason: 'ValidationError',
+            message: `${nonStringField} must be a string`,
+            location: nonStringField
+        })
+    }
+
+    // update status when decision changes
+    if ('decision' in updateReq) {
+        updatedSubmission.status = updateReq['decision']
+    }
+    updatedSubmission.reviewerInfo = updateReq;
+
+    Submission.findByIdAndUpdate(req.params.id, updatedSubmission)
+        .then(res.status(204).json({message: `${req.params.id} updated`}))
+
 });
 
 module.exports = router;

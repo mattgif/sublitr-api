@@ -3,6 +3,7 @@ const chai = require('chai');
 const chaiHttp = require('chai-http');
 const jwt = require('jsonwebtoken');
 const faker = require('faker');
+const fs = require('fs');
 
 const {app, runServer, closeServer} = require('../server');
 const {TEST_DATABASE_URL, JWT_SECRET} = require('../config');
@@ -427,7 +428,7 @@ describe('submissions API', () => {
                 })
         });
 
-        // TODO: file, cover letter
+        // TODO: file upload?
 
         it('should reject a submission with non string publication', () => {
             const nonStringPub = {
@@ -469,6 +470,27 @@ describe('submissions API', () => {
                 })
         });
 
+        it('should reject a submission with a non string cover letter', () => {
+            const nonstringCover = {
+                title: faker.lorem.words(),
+                publication: faker.random.words(),
+                file: faker.system.commonFileName(),
+                coverLetter: 23
+            };
+
+            return chai.request(app)
+                .post('/api/submissions')
+                .send(nonstringCover)
+                .set('authorization', `Bearer ${userToken}`)
+                .then(res => {
+                    expect(res).to.have.status(422);
+                    expect(res).to.be.json;
+                    expect(res.body.reason).to.equal('ValidationError');
+                    expect(res.body.message).to.equal('coverLetter must be a string');
+                    expect(res.body.location).to.equal('coverLetter');
+                })
+        });
+
         it('should reject a submission with an overly long title', () => {
             const tooLongTitle = {
                 title: Array(129).fill('a').join(''),
@@ -486,6 +508,27 @@ describe('submissions API', () => {
                     expect(res.body.reason).to.equal('ValidationError');
                     expect(res.body.message).to.equal('Can\'t be more than 128 characters long');
                     expect(res.body.location).to.equal('title');
+                })
+        });
+
+        it('should reject a submission with an overly long cover letter', () => {
+            const tooLongCover = {
+                title: faker.lorem.words(),
+                publication: faker.lorem.words(),
+                file: faker.system.commonFileName(),
+                coverLetter: Array(3001).fill('a').join('')
+            };
+
+            return chai.request(app)
+                .post('/api/submissions')
+                .send(tooLongCover)
+                .set('authorization', `Bearer ${userToken}`)
+                .then(res => {
+                    expect(res).to.have.status(422);
+                    expect(res).to.be.json;
+                    expect(res.body.reason).to.equal('ValidationError');
+                    expect(res.body.message).to.equal('Can\'t be more than 3000 characters long');
+                    expect(res.body.location).to.equal('coverLetter');
                 })
         });
 
@@ -510,9 +553,16 @@ describe('submissions API', () => {
         });
 
         it('should create a new submission', () => {
+            const submission = Object.assign({}, newSubmission, {
+                coverLetter: faker.lorem.paragraphs()
+            });
+
             return chai.request(app)
                 .post('/api/submissions')
-                .send(newSubmission)
+                .field('title', faker.lorem.words())
+                .field('publication', faker.random.words())
+                .field('coverLetter', submission.coverLetter)
+                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(201);
@@ -520,7 +570,262 @@ describe('submissions API', () => {
                     expectedFields.forEach(field => { expect(field in res.body).to.be.true });
                     expect(res.body.author).to.equal(`${userFirst} ${userLast}`);
                     expect(res.body.authorID).to.equal(userID);
+                    expect(res.body.coverLetter).to.equal(submission.coverLetter);
                 })
         })
+    })
+
+    describe('PUT endpoint', () => {
+        // get submission as admin
+        // make PUT request to id of retrieved submissions
+
+        describe('auth checks', () => {
+            const updatedSubmission = {
+                author: 'New Author'
+            };
+
+            it('should reject anonymous requests', () => {
+                return chai.request(app)
+                    .get('/api/submissions')
+                    .set('authorization', `Bearer ${adminToken}`)
+                    .then(res => {
+                        const submissionID = res.body[0].id;
+                        return chai.request(app)
+                            .put(`/api/submissions/${submissionID}`)
+                            .send(updatedSubmission)
+                            .then(res => expect(res).to.have.status(401))
+                    })
+            });
+
+            it('should reject requests with an invalid token', () => {
+                const invalidToken = jwt.sign({
+                        user: {
+                            email: userEmail,
+                            firstName: faker.name.firstName(),
+                            lastName: faker.name.lastName()
+                        }
+                    },
+                    'notTheSecret',
+                    {
+                        algorithm: 'HS256',
+                        subject: userEmail,
+                        expiresIn: '7d'
+                    }
+                );
+
+                return chai.request(app)
+                    .get('/api/submissions')
+                    .set('authorization', `Bearer ${adminToken}`)
+                    .then(res => {
+                        const submissionID = res.body[0].id;
+                        return chai.request(app)
+                            .put(`/api/submissions/${submissionID}`)
+                            .send(updatedSubmission)
+                            .set('authorization', `Bearer ${invalidToken}`)
+                            .then(res => expect(res).to.have.status(401))
+                    })
+            })
+
+            it('should reject requests from non-editor/admin users', () => {
+                return chai.request(app)
+                    .get('/api/submissions')
+                    .set('authorization', `Bearer ${adminToken}`)
+                    .then(res => {
+                        const submissionID = res.body[0].id;
+                        return chai.request(app)
+                            .put(`/api/submissions/${submissionID}`)
+                            .send(updatedSubmission)
+                            .set('authorization', `Bearer ${userToken}`)
+                            .then(res => expect(res).to.have.status(401))
+                    })
+            })
+        });
+
+        it('should reject request with mismatched req id and param id', () => {
+            const newStatus = 'accepted';
+            const subWithNewStatus = {
+                reviewerInfo: {
+                    decision: newStatus
+                }
+            };
+
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    subWithNewStatus.id = res.body[0].id;
+                    return chai.request(app)
+                        .put(`/api/submissions/notCorrectId`)
+                        .send(subWithNewStatus)
+                        .set('authorization', `Bearer ${editorToken}`)
+                        .then(res => {
+                            expect(res).to.have.status(400);
+                        })
+                })
+        });
+
+        it('should reject request with non-string decision', () => {
+            const subWithNewStatus = {
+                reviewerInfo: {
+                    decision: 2345
+                }
+            };
+
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    const submissionID = res.body[0].id;
+                    subWithNewStatus.id = submissionID;
+                    return chai.request(app)
+                        .put(`/api/submissions/${submissionID}`)
+                        .send(subWithNewStatus)
+                        .set('authorization', `Bearer ${editorToken}`)
+                        .then(res => {
+                            expect(res).to.have.status(422);
+                            expect(res).to.be.json;
+                            expect(res.body.reason).to.equal('ValidationError');
+                            expect(res.body.message).to.equal(`decision must be a string`);
+                            expect(res.body.location).to.equal('decision');
+                        })
+                })
+        });
+
+        it('should reject request with non-string recommendation', () => {
+            const subWithNewStatus = {
+                reviewerInfo: {
+                    recommendation: 2345
+                }
+            };
+
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    const submissionID = res.body[0].id;
+                    subWithNewStatus.id = submissionID;
+                    return chai.request(app)
+                        .put(`/api/submissions/${submissionID}`)
+                        .send(subWithNewStatus)
+                        .set('authorization', `Bearer ${editorToken}`)
+                        .then(res => {
+                            expect(res).to.have.status(422);
+                            expect(res).to.be.json;
+                            expect(res.body.reason).to.equal('ValidationError');
+                            expect(res.body.message).to.equal(`recommendation must be a string`);
+                            expect(res.body.location).to.equal('recommendation');
+                        })
+                })
+        });
+
+        it('should update the decision & status on editor request', () => {
+            // get request from admin to grab a valid submission id
+            // put request to end point
+            // check for success status
+            // fetch submission from db and inspect changes
+            const newStatus = 'accepted';
+            const subWithNewStatus = {
+                reviewerInfo: {
+                    decision: newStatus
+                }
+            };
+
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    const submissionID = res.body[0].id;
+                    subWithNewStatus.id = submissionID;
+                    return chai.request(app)
+                        .put(`/api/submissions/${submissionID}`)
+                        .send(subWithNewStatus)
+                        .set('authorization', `Bearer ${editorToken}`)
+                        .then(res => {
+                            expect(res).to.have.status(204);
+                            return Submission.findById(submissionID)
+                        })
+                        .then(sub => {
+                            expect(sub.status).to.equal(newStatus);
+                            expect(sub.reviewerInfo.decision).to.equal(newStatus);
+                        })
+                })
+        });
+
+        it('should update the decision & status on admin request', () => {
+            // get request from admin to grab a valid submission id
+            // put request to end point
+            // check for success status
+            // fetch submission from db and inspect changes
+            const newStatus = 'accepted';
+            const subWithNewStatus = {
+                reviewerInfo: {
+                    decision: newStatus
+                }
+            };
+
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    const submissionID = res.body[0].id;
+                    subWithNewStatus.id = submissionID;
+                    return chai.request(app)
+                        .put(`/api/submissions/${submissionID}`)
+                        .send(subWithNewStatus)
+                        .set('authorization', `Bearer ${adminToken}`)
+                        .then(res => {
+                            expect(res).to.have.status(204);
+                            return Submission.findById(submissionID)
+                        })
+                        .then(sub => {
+                            expect(sub.status).to.equal(newStatus);
+                            expect(sub.reviewerInfo.decision).to.equal(newStatus);
+                        })
+                })
+        });
+
+        it('should update the recommendation', () => {
+            // get request from admin to grab a valid submission id
+            // put request to end point
+            // check for success status
+            // fetch submission from db and inspect changes
+            const newStatus = 'accepted';
+            const subWithNewStatus = {
+                reviewerInfo: {
+                    recommendation: newStatus
+                }
+            };
+
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    const submissionID = res.body[0].id;
+                    subWithNewStatus.id = submissionID;
+                    return chai.request(app)
+                        .put(`/api/submissions/${submissionID}`)
+                        .send(subWithNewStatus)
+                        .set('authorization', `Bearer ${editorToken}`)
+                        .then(res => {
+                            expect(res).to.have.status(204);
+                            return Submission.findById(submissionID)
+                        })
+                        .then(sub => {
+                            expect(sub.reviewerInfo.recommendation).to.equal(newStatus);
+                        })
+                })
+        });
+
+        it('should reject a comment without a name', () => {
+
+        });
+
+        it('should reject a comment without authorID', () => {});
+
+        it('should reject a comment without text', () => {});
+
+        it('should add a first comment', () => {});
+
+        it('should add an additional comment');
     })
 });

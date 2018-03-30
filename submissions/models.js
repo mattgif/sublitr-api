@@ -32,6 +32,7 @@ const SubmissionSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    coverLetter: String,
     reviewerInfo: {
         decision: {
             type: String,
@@ -67,6 +68,7 @@ SubmissionSchema.methods.serialize = function(editor) {
         submitted: this.submitted,
         status: this.status,
         publication: this.publication,
+        coverLetter: this.coverLetter
     };
 
     if (editor) {
