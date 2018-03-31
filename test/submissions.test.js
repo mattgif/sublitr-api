@@ -352,17 +352,14 @@ describe('submissions API', () => {
     });
 
     describe('POST endpoint', () => {
-        const newSubmission = {
-            title: faker.lorem.words(),
-            publication: faker.random.words(),
-            file: faker.system.commonFileName(),
-        };
-
         describe('auth checks', () => {
             it('should reject anonymous requests', () => {
                 return chai.request(app)
                     .post('/api/submissions')
-                    .send(newSubmission)
+                    .field('title', faker.lorem.words())
+                    .field('publication', faker.random.words())
+                    .field('coverLetter', faker.lorem.paragraphs(2))
+                    .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                     .then(res => expect(res).to.have.status(401))
             });
 
@@ -384,21 +381,21 @@ describe('submissions API', () => {
 
                 return chai.request(app)
                     .post('/api/submissions')
-                    .send(newSubmission)
+                    .field('title', faker.lorem.words())
+                    .field('publication', faker.random.words())
+                    .field('coverLetter', faker.lorem.paragraphs(2))
+                    .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                     .set('authorization', `Bearer ${invalidToken}`)
                     .then(res => expect(res).to.have.status(401))
             })
         });
 
         it('should reject a submission with a missing title', () => {
-            const missingTitle = {
-                publication: faker.random.words(),
-                file: faker.system.commonFileName(),
-            };
-
             return chai.request(app)
-                .post('/api/submissions')
-                .send(missingTitle)
+                .post('/api/submissions')                
+                .field('publication', faker.random.words())
+                .field('coverLetter', faker.lorem.paragraphs(2))
+                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')                
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(422);
@@ -410,14 +407,11 @@ describe('submissions API', () => {
         });
 
         it('should reject a submission with a missing publication', () => {
-            const missingPub = {
-                title: faker.lorem.words(),
-                file: faker.system.commonFileName(),
-            };
-
             return chai.request(app)
                 .post('/api/submissions')
-                .send(missingPub)
+                .field('title', faker.lorem.words())
+                .field('coverLetter', faker.lorem.paragraphs(2))
+                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(422);
@@ -430,16 +424,14 @@ describe('submissions API', () => {
 
         // TODO: file upload?
 
-        it('should reject a submission with non string publication', () => {
-            const nonStringPub = {
-                title: faker.lorem.words(),
-                publication: 11,
-                file: faker.system.commonFileName(),
-            };
-
+        it.skip('should reject a submission with non string publication', () => {            
+            // TODO: new test; field() coverts argument to string
             return chai.request(app)
                 .post('/api/submissions')
-                .send(nonStringPub)
+                .field('title', faker.lorem.words())
+                .field('publication', 11)
+                .field('coverLetter', faker.lorem.paragraphs(2))
+                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(422);
@@ -450,7 +442,8 @@ describe('submissions API', () => {
                 })
         });
 
-        it('should reject a submission with non string title', () => {
+        it.skip('should reject a submission with non string title', () => {
+            // TODO: new test; field() converts argument to string
             const nonStringTitle = {
                 title: 325,
                 publication: faker.lorem.words(),
@@ -459,7 +452,10 @@ describe('submissions API', () => {
 
             return chai.request(app)
                 .post('/api/submissions')
-                .send(nonStringTitle)
+                .field('title', 12312)
+                .field('publication', faker.random.words())
+                .field('coverLetter', faker.lorem.paragraphs(2))
+                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(422);
@@ -470,17 +466,14 @@ describe('submissions API', () => {
                 })
         });
 
-        it('should reject a submission with a non string cover letter', () => {
-            const nonstringCover = {
-                title: faker.lorem.words(),
-                publication: faker.random.words(),
-                file: faker.system.commonFileName(),
-                coverLetter: 23
-            };
-
+        it.skip('should reject a submission with a non string cover letter', () => {
+            // need new test - field converts argument to string 
             return chai.request(app)
                 .post('/api/submissions')
-                .send(nonstringCover)
+                .field('title', faker.lorem.words())
+                .field('publication', faker.random.words())
+                .field('coverLetter', 72392935492)
+                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(422);
@@ -491,16 +484,13 @@ describe('submissions API', () => {
                 })
         });
 
-        it('should reject a submission with an overly long title', () => {
-            const tooLongTitle = {
-                title: Array(129).fill('a').join(''),
-                publication: faker.lorem.words(),
-                file: faker.system.commonFileName(),
-            };
-
+        it('should reject a submission with an overly long title', () => {            
             return chai.request(app)
                 .post('/api/submissions')
-                .send(tooLongTitle)
+                .field('title', Array(129).fill('a').join(''))
+                .field('publication', faker.random.words())
+                .field('coverLetter', faker.lorem.paragraphs(2))
+                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(422);
@@ -512,16 +502,12 @@ describe('submissions API', () => {
         });
 
         it('should reject a submission with an overly long cover letter', () => {
-            const tooLongCover = {
-                title: faker.lorem.words(),
-                publication: faker.lorem.words(),
-                file: faker.system.commonFileName(),
-                coverLetter: Array(3001).fill('a').join('')
-            };
-
             return chai.request(app)
                 .post('/api/submissions')
-                .send(tooLongCover)
+                .field('title', faker.lorem.words())
+                .field('publication', faker.random.words())
+                .field('coverLetter', Array(3001).fill('a').join(''))
+                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(422);
@@ -533,15 +519,12 @@ describe('submissions API', () => {
         });
 
         it('should reject a submission with a pure whitespace title', () => {
-            const whitespaceTitle = {
-                title: '                      ',
-                publication: faker.lorem.words(),
-                file: faker.system.commonFileName(),
-            };
-
             return chai.request(app)
                 .post('/api/submissions')
-                .send(whitespaceTitle)
+                .field('title', '                    ')
+                .field('publication', faker.random.words())
+                .field('coverLetter', faker.lorem.paragraphs(2))
+                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(422);
@@ -553,15 +536,12 @@ describe('submissions API', () => {
         });
 
         it('should create a new submission', () => {
-            const submission = Object.assign({}, newSubmission, {
-                coverLetter: faker.lorem.paragraphs()
-            });
-
+            const coverLetter = faker.lorem.paragraphs()
             return chai.request(app)
                 .post('/api/submissions')
                 .field('title', faker.lorem.words())
                 .field('publication', faker.random.words())
-                .field('coverLetter', submission.coverLetter)
+                .field('coverLetter', coverLetter)
                 .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
@@ -570,7 +550,7 @@ describe('submissions API', () => {
                     expectedFields.forEach(field => { expect(field in res.body).to.be.true });
                     expect(res.body.author).to.equal(`${userFirst} ${userLast}`);
                     expect(res.body.authorID).to.equal(userID);
-                    expect(res.body.coverLetter).to.equal(submission.coverLetter);
+                    expect(res.body.coverLetter).to.equal(coverLetter);
                 })
         })
     })
