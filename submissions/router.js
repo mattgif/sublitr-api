@@ -1,26 +1,16 @@
 const express = require('express');
 const passport = require('passport');
 const bodyParser = require('body-parser');
-const aws = require('aws-sdk');
 const fileUpload = require('express-fileupload');
 const fs = require('fs');
 
 const {Submission} = require('../submissions/models');
 
 const router = express.Router();
-const { S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = require('../config');
 
 const jsonParser = bodyParser.json();
 const jwtAuth = passport.authenticate('jwt', {session: false});
-const AWS_REGION = 'us-east-2';
 
-aws.config.update({
-    accessKeyId: AWS_ACCESS_KEY_ID,
-    secretAccessKey: AWS_SECRET_ACCESS_KEY,
-    region: AWS_REGION
-});
-
-const s3 = new aws.S3();
 
 router.use(jsonParser);
 router.use(jwtAuth);
@@ -71,11 +61,8 @@ router.get('/:submissionID', (req, res) => {
         })
 });
 
-router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload()], (req, res) => {
-    console.log(req.files.doc);
-
-    // Check for missing fields
-    // TODO: file field
+router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload()], (req, res) => {  
+    // Check for missing fields    
     const requiredFields = ['title', 'publication'];
     const missingField = requiredFields.find(field => !(field in req.body));
     if (missingField) {
@@ -87,6 +74,14 @@ router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload()], (req
         })
     }
 
+    if (!req.files) {
+           return res.status(422).json({
+            code: 422,
+            reason: 'ValidationError',
+            message: 'Missing field',
+            location: 'doc'
+        }) 
+    }
     // Check that each field is the correct type
     // TODO: file type
     const stringFields = ['title', 'publication', 'coverLetter'];

@@ -422,7 +422,21 @@ describe('submissions API', () => {
                 })
         });
 
-        // TODO: file upload?
+        it('should reject a submission with a missing file', () => {
+           return chai.request(app)
+                .post('/api/submissions')                
+                .field('publication', faker.random.words())
+                .field('coverLetter', faker.lorem.paragraphs(2))
+                .field('title', faker.random.words())               
+                .set('authorization', `Bearer ${userToken}`)
+                .then(res => {
+                    expect(res).to.have.status(422);
+                    expect(res).to.be.json;
+                    expect(res.body.reason).to.equal('ValidationError');
+                    expect(res.body.message).to.equal('Missing field');
+                    expect(res.body.location).to.equal('doc');
+                }) 
+        })
 
         it.skip('should reject a submission with non string publication', () => {            
             // TODO: new test; field() coverts argument to string
