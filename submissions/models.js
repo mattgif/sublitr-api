@@ -68,11 +68,11 @@ SubmissionSchema.methods.serialize = function(editor) {
         submitted: this.submitted,
         status: this.status,
         publication: this.publication,
-        coverLetter: this.coverLetter
+        coverLetter: this.coverLetter,
+        file: this.file
     };
 
     if (editor) {
-        submission.file = this.file;
         submission.reviewerInfo = this.reviewerInfo;
     }
 

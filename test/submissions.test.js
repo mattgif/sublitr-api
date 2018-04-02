@@ -4,10 +4,14 @@ const chaiHttp = require('chai-http');
 const jwt = require('jsonwebtoken');
 const faker = require('faker');
 const fs = require('fs');
+const sinon = require('sinon');
+
 
 const {app, runServer, closeServer} = require('../server');
 const {TEST_DATABASE_URL, JWT_SECRET} = require('../config');
 const {Submission} = require('../submissions/models');
+const {submissionRouter} = require('../submissions/router');
+const awsHandler = require('../submissions/aws-handler');
 
 const expect = chai.expect;
 
@@ -345,7 +349,7 @@ describe('submissions API', () => {
                     expect(res.body).to.be.an('object');
                     expectedFields.forEach(field => { expect(field in res.body).to.be.true });
                     expect('reviewerInfo' in res.body).to.be.false;
-                    expect('file' in res.body).to.be.false;
+                    expect('file' in res.body).to.be.true;
                     expect(res.body.status).to.equal('pending');
                 })
         });
@@ -356,10 +360,7 @@ describe('submissions API', () => {
             it('should reject anonymous requests', () => {
                 return chai.request(app)
                     .post('/api/submissions')
-                    .field('title', faker.lorem.words())
-                    .field('publication', faker.random.words())
-                    .field('coverLetter', faker.lorem.paragraphs(2))
-                    .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
+                    .send({whatever:'dummy'})
                     .then(res => expect(res).to.have.status(401))
             });
 
@@ -381,10 +382,7 @@ describe('submissions API', () => {
 
                 return chai.request(app)
                     .post('/api/submissions')
-                    .field('title', faker.lorem.words())
-                    .field('publication', faker.random.words())
-                    .field('coverLetter', faker.lorem.paragraphs(2))
-                    .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
+                    .send({whatever:'dummy'})
                     .set('authorization', `Bearer ${invalidToken}`)
                     .then(res => expect(res).to.have.status(401))
             })
@@ -436,7 +434,7 @@ describe('submissions API', () => {
                     expect(res.body.message).to.equal('Missing field');
                     expect(res.body.location).to.equal('doc');
                 }) 
-        })
+        });
 
         it.skip('should reject a submission with non string publication', () => {            
             // TODO: new test; field() coverts argument to string
@@ -549,25 +547,63 @@ describe('submissions API', () => {
                 })
         });
 
+        it('should reject a submission with attachment of wrong file type', () => {
+            return chai.request(app)
+                .post('/api/submissions')
+                .field('title', faker.random.words())
+                .field('publication', faker.random.words())
+                .field('coverLetter', faker.lorem.paragraphs(2))
+                .attach('doc', fs.readFileSync('./test/354.jpg'), '354.jpg')
+                .set('authorization', `Bearer ${userToken}`)
+                .then(res => {
+                    expect(res).to.have.status(422);
+                    expect(res).to.be.json;
+                    expect(res.body.reason).to.equal('ValidationError');
+                    expect(res.body.message).to.equal(`Invalid file type`);
+                    expect(res.body.location).to.equal('doc');
+                })
+        });
+
+        it.skip('should reject a submission with an attachment that is too large', () => {
+            return chai.request(app)
+                .post('/api/submissions')
+                .field('title', faker.random.words())
+                .field('publication', faker.random.words())
+                .field('coverLetter', faker.lorem.paragraphs(2))
+                .attach('doc', fs.readFileSync('./test/26mb.pdf'), '26mb.pdf')
+                .set('authorization', `Bearer ${userToken}`)
+                .then(res => {
+                    expect(res).to.have.status(413);
+                })
+        }).timeout(4000);
+
         it('should create a new submission', () => {
-            const coverLetter = faker.lorem.paragraphs()
+            const coverLetter = faker.lorem.paragraphs();
+            const fileName = 'spicer-extracts.pdf';
+            // stub for s3 uploads
+            // const s3UploadStub = sinon.stub(awsHandler, 's3Upload');
+            // s3UploadStub.resolves(`https://s3.amazonaws.com/sublitr/${userID}-${fileName}`);
+
             return chai.request(app)
                 .post('/api/submissions')
                 .field('title', faker.lorem.words())
                 .field('publication', faker.random.words())
                 .field('coverLetter', coverLetter)
-                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
+                .attach('doc', fs.readFileSync(`./test/${fileName}`), fileName)
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(201);
                     expect(res).to.be.json;
                     expectedFields.forEach(field => { expect(field in res.body).to.be.true });
+                    console.log(`submission test res.body: ${res.body}`);
                     expect(res.body.author).to.equal(`${userFirst} ${userLast}`);
                     expect(res.body.authorID).to.equal(userID);
                     expect(res.body.coverLetter).to.equal(coverLetter);
+                    expect(res.body.file).to.equal(`https://s3.amazonaws.com/sublitr/${userID}-${fileName}`);
+                    // sinon.assert.calledOnce(s3UploadStub);
                 })
         })
-    })
+    });
 
     describe('PUT endpoint', () => {
         // get submission as admin
