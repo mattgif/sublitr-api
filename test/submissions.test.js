@@ -22,6 +22,9 @@ const NUM_SUBMISSIONS_BY_SPECIFIC_USER = 5;
 
 const adminEmail = 'adminTest@sublitr.com';
 const editorEmail = 'editorTest@example.com';
+const editorFirst = 'Ed';
+const editorLast = 'Ditor';
+const editorID = '098765431';
 const userEmail = 'testUser@example.com';
 const userID = '1234567880';
 const userFirst = 'Usey';
@@ -48,8 +51,9 @@ const adminToken = jwt.sign({
 const editorToken = jwt.sign({
         user: {
             email: editorEmail,
-            firstName: faker.name.firstName(),
-            lastName: faker.name.lastName(),
+            firstName: editorFirst,
+            lastName: editorLast,
+            id: editorID,
             admin: false,
             editor: true
         }
@@ -286,7 +290,7 @@ describe('submissions API', () => {
                     .set('authorization', `Bearer ${notAuthorToken}`)
                     .then(res => expect(res).to.have.status(401))
             });
-        })
+        });
 
         it('should return specific submission for editor',  () => {
             return chai.request(app)
@@ -390,10 +394,10 @@ describe('submissions API', () => {
 
         it('should reject a submission with a missing title', () => {
             return chai.request(app)
-                .post('/api/submissions')                
+                .post('/api/submissions')
                 .field('publication', faker.random.words())
                 .field('coverLetter', faker.lorem.paragraphs(2))
-                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')                
+                .attach('doc', fs.readFileSync('./test/spicer-extracts.pdf'), 'spicer-extracts.pdf')
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(422);
@@ -421,11 +425,11 @@ describe('submissions API', () => {
         });
 
         it('should reject a submission with a missing file', () => {
-           return chai.request(app)
-                .post('/api/submissions')                
+            return chai.request(app)
+                .post('/api/submissions')
                 .field('publication', faker.random.words())
                 .field('coverLetter', faker.lorem.paragraphs(2))
-                .field('title', faker.random.words())               
+                .field('title', faker.random.words())
                 .set('authorization', `Bearer ${userToken}`)
                 .then(res => {
                     expect(res).to.have.status(422);
@@ -433,10 +437,10 @@ describe('submissions API', () => {
                     expect(res.body.reason).to.equal('ValidationError');
                     expect(res.body.message).to.equal('Missing field');
                     expect(res.body.location).to.equal('doc');
-                }) 
+                })
         });
 
-        it.skip('should reject a submission with non string publication', () => {            
+        it.skip('should reject a submission with non string publication', () => {
             // TODO: new test; field() coverts argument to string
             return chai.request(app)
                 .post('/api/submissions')
@@ -496,7 +500,7 @@ describe('submissions API', () => {
                 })
         });
 
-        it('should reject a submission with an overly long title', () => {            
+        it('should reject a submission with an overly long title', () => {
             return chai.request(app)
                 .post('/api/submissions')
                 .field('title', Array(129).fill('a').join(''))
@@ -595,7 +599,6 @@ describe('submissions API', () => {
                     expect(res).to.have.status(201);
                     expect(res).to.be.json;
                     expectedFields.forEach(field => { expect(field in res.body).to.be.true });
-                    console.log(`submission test res.body: ${res.body}`);
                     expect(res.body.author).to.equal(`${userFirst} ${userLast}`);
                     expect(res.body.authorID).to.equal(userID);
                     expect(res.body.coverLetter).to.equal(coverLetter);
@@ -654,7 +657,7 @@ describe('submissions API', () => {
                             .set('authorization', `Bearer ${invalidToken}`)
                             .then(res => expect(res).to.have.status(401))
                     })
-            })
+            });
 
             it('should reject requests from non-editor/admin users', () => {
                 return chai.request(app)
@@ -845,17 +848,211 @@ describe('submissions API', () => {
                         })
                 })
         });
+    });
 
-        it('should reject a comment without a name', () => {
-
+    describe('PUT comment endpoint', () => {
+        it('should reject requests from non-editor/admin users', () => {
+            const comment = {text: faker.random.words()};
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    return chai.request(app)
+                        .put(`/api/submissions/${res.body[0].id}/comment`)
+                        .send(comment)
+                        .set('authorization', `Bearer ${userToken}`)
+                        .then(res => expect(res).to.have.status(401))
+                })
         });
 
-        it('should reject a comment without authorID', () => {});
+        it('should reject a comment without text', () => {
+            const newComment = {
+                text: '     '
+            };
 
-        it('should reject a comment without text', () => {});
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    return chai.request(app)
+                        .put(`/api/submissions/${res.body[0].id}/comment`)
+                        .send(newComment)
+                        .set('authorization', `Bearer ${editorToken}`)
+                        .then(res => {
+                            expect(res).to.have.status(422);
+                            expect(res).to.be.json;
+                            expect(res.body.reason).to.equal('ValidationError');
+                            expect(res.body.message).to.equal(`Comment cannot be empty`);
+                            expect(res.body.location).to.equal('text');
+                        })
+                })
+        });
 
-        it('should add a first comment', () => {});
+        it('should add a first comment', () => {
+            const newComment = {
+                text: faker.random.words()
+            };
 
-        it('should add an additional comment');
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    const submissionID = res.body[0].id;
+                    return chai.request(app)
+                        .put(`/api/submissions/${submissionID}/comment`)
+                        .send(newComment)
+                        .set('authorization', `Bearer ${editorToken}`)
+                        .then(res => {
+                            expect(res).to.have.status(204);
+                            return Submission.findById(submissionID)
+                        })
+                        .then(sub => {
+                            expect(sub.reviewerInfo.comments).to.be.an('array');
+                            expect(sub.reviewerInfo.comments).to.have.length(1);
+                            const comment = sub.reviewerInfo.comments[0];
+                            expect(comment.name).to.equal(`${editorFirst} ${editorLast}`);
+                            expect(comment.text).to.equal(newComment.text);
+                            expect(comment.authorID).to.equal(editorID);
+                            expect('date' in comment).to.be.true;
+                        })
+                })
+        });
+
+        it('should add an additional comment', () => {
+            const newComment = {
+                text: faker.random.words()
+            };
+
+            const oldComments = [
+                {name: 'Betty Brown', authorID: 'u222222', date: '2018-03-04 21:12', text: faker.lorem.paragraphs()},
+                {name: 'Abe Abrams', authorID: 'u111111', date: '2018-03-03 08:30', text: faker.lorem.paragraphs()},
+                {name: 'Debbie Douglas', authorID: 'u444444', date: '2018-03-03 08:00', text: faker.lorem.paragraphs()}
+            ];
+
+            let submissionID;
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    submissionID = res.body[0].id;
+                    return Submission.findById(submissionID)
+                })
+                .then(sub => {
+                    sub.reviewerInfo.comments = oldComments;
+                    sub.save()
+                })
+                .then(() => {
+                    return chai.request(app)
+                        .put(`/api/submissions/${submissionID}/comment`)
+                        .send(newComment)
+                        .set('authorization', `Bearer ${editorToken}`)
+                        .then(res => {
+                            expect(res).to.have.status(204);
+                            return Submission.findById(submissionID)
+                        })
+                        .then(sub => {
+                            expect(sub.reviewerInfo.comments).to.be.an('array');
+                            expect(sub.reviewerInfo.comments).to.have.length(oldComments.length + 1);
+                            const comment = sub.reviewerInfo.comments.find(comment => comment.authorID === editorID);
+                            expect(comment).to.exist;
+                            expect(comment.name).to.equal(`${editorFirst} ${editorLast}`);
+                            expect(comment.text).to.equal(newComment.text);
+                            expect('date' in comment).to.be.true;
+                        })
+                });
+        });
+    });
+
+    describe('DELETE endpoint', () => {
+        describe('auth checks', () => {
+            it('should reject anonymous requests', () => {
+                return chai.request(app)
+                    .get('/api/submissions')
+                    .set('authorization', `Bearer ${adminToken}`)
+                    .then(res => {
+                        const submissionID = res.body[0].id;
+                        return chai.request(app)
+                            .delete(`/api/submissions/${submissionID}`)
+                            .then(res => expect(res).to.have.status(401))
+                    })
+            });
+
+            it('should reject requests with an invalid token', () => {
+                const invalidToken = jwt.sign({
+                        user: {
+                            email: userEmail,
+                            firstName: faker.name.firstName(),
+                            lastName: faker.name.lastName()
+                        }
+                    },
+                    'notTheSecret',
+                    {
+                        algorithm: 'HS256',
+                        subject: userEmail,
+                        expiresIn: '7d'
+                    }
+                );
+
+                return chai.request(app)
+                    .get('/api/submissions')
+                    .set('authorization', `Bearer ${adminToken}`)
+                    .then(res => {
+                        const submissionID = res.body[0].id;
+                        return chai.request(app)
+                            .delete(`/api/submissions/${submissionID}`)
+                            .set('authorization', `Bearer ${invalidToken}`)
+                            .then(res => expect(res).to.have.status(401))
+                    });
+            });
+
+            it('should reject requests from non-admin, non-editor users who aren\'t the author', () => {
+                const notAuthorToken = jwt.sign({
+                        user: {
+                            email: 'notauthor@example.com',
+                            id: 'notlegit',
+                            firstName: 'testast',
+                            lastName: 'asdfas',
+                            admin: false,
+                            editor: false
+                        }
+                    },
+                    JWT_SECRET,
+                    {
+                        algorithm: 'HS256',
+                        subject: 'notauthor@example.com',
+                        expiresIn: '7d'
+                    }
+                );
+
+                return chai.request(app)
+                    .get('/api/submissions')
+                    .set('authorization', `Bearer ${adminToken}`)
+                    .then(res => {
+                        const submissionID = res.body[0].id;
+                        return chai.request(app)
+                            .delete(`/api/submissions/${submissionID}`)
+                            .set('authorization', `Bearer ${notAuthorToken}`)
+                            .then(res => expect(res).to.have.status(401))
+                    });
+            });
+        });
+        // TODO: stub s3
+        it('should delete the submission', () => {
+            let submissionID;
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    submissionID = res.body[0].id;
+                    return chai.request(app)
+                        .delete(`/api/submissions/${submissionID}`)
+                        .set('authorization', `Bearer ${adminToken}`)
+                        .then(res => {
+                            expect(res).to.have.status(204);
+                            Submission.findById(submissionID)
+                                .then((sub) => expect(sub).to.be.undefined)
+                        })
+                });
+        });
     })
 });

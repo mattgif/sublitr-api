@@ -62,15 +62,7 @@ router.get('/:submissionID', (req, res) => {
         })
 });
 
-router.post('/',
-    [
-        bodyParser.urlencoded({ extended: true }),
-        fileUpload({
-            limits: { fileSize: MAX_FILE_SIZE } ,
-            abortOnLimit: true
-        })
-    ],
-    (req, res) => {
+router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload({ limits: { fileSize: MAX_FILE_SIZE } , abortOnLimit: true})], (req, res) => {
         // Check for missing fields
         const requiredFields = ['title', 'publication'];
         const missingField = requiredFields.find(field => !(field in req.body));
@@ -147,7 +139,6 @@ router.post('/',
             Body: req.files.doc.data,
             ContentType: req.files.doc.mimetype
         }).then(submissionURL => {
-            console.log(submissionURL);
             Submission.create(
                 {
                     title: req.body.title,
@@ -163,8 +154,43 @@ router.post('/',
         }).catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
     });
 
-router.put('/:id', (req, res) => {
+router.put('/:id/comment', (req, res) => {
     if (!(req.user.admin || req.user.editor)) {
+        return res.status(401).json({
+            code: 401,
+            reason: 'AuthenticationError',
+            message: `Not authorized to comment on submission ${req.params.id}`
+        })
+    }
+
+    // make sure comment is present and not empty
+    if (!req.body.text || (req.body.text.trim().length < 1)) {
+        return res.status(422).json({
+            code: 422,
+            reason: 'ValidationError',
+            message: `Comment cannot be empty`,
+            location: 'text'
+        })
+    }
+
+    const comment = {
+        name: `${req.user.firstName} ${req.user.lastName}`,
+        authorID: req.user.id,
+        date: Date.now(),
+        text: req.body.text.trim()
+    };
+
+    Submission.findById(req.params.id)
+        .then(submission => {
+            submission.reviewerInfo.comments.push(comment);
+            submission.save()
+            res.status(204).json({message: `${req.params.id} updated`})
+        })
+        .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
+});
+
+router.put('/:id', (req, res) => {
+    if (!req.user.admin && !req.user.editor) {
         return res.status(401).json({
             code: 401,
             reason: 'AuthenticationError',
@@ -182,7 +208,6 @@ router.put('/:id', (req, res) => {
 
     const updateReq = req.body.reviewerInfo;
     const updatedSubmission = {};
-    const updatableFields = ['decision', 'recommendation'];
 
     const stringFields = ['decision', 'recommendation'];
     const nonStringField = stringFields.find(field => (field in updateReq) && !(typeof updateReq[field] === 'string'));
@@ -203,7 +228,25 @@ router.put('/:id', (req, res) => {
 
     Submission.findByIdAndUpdate(req.params.id, updatedSubmission)
         .then(res.status(204).json({message: `${req.params.id} updated`}))
+        .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
+});
 
+router.delete('/:id', (req, res) => {
+    if (!req.user.admin && !req.user.editor) {
+        return res.status(401).json({
+            code: 401,
+            reason: 'AuthenticationError',
+            message: `Not authorized`
+        })
+    }
+
+    Submission.findById(req.params.id)
+        .then(sub => {
+            s3Delete(sub.file);
+            sub.remove()
+        })
+        .then(() => res.status(204).end())
+        .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
 });
 
 module.exports = router;

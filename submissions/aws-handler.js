@@ -40,25 +40,25 @@ function s3Upload(fileInfo) {
 
 function s3Delete(url) {
     // takes string URL for file location and deletes that file from s3
-    const split = url.split('/');
-    const key = split[split.length-1];
-    const params = {
-        Bucket: S3_BUCKET,
-        Delete: {
-            Objects: [{
-                Key: key,
-            }]
-        }
-    };
-
-    s3.deleteObjects(params, function(err, data) {
-        if (err) {
-            console.error(err, err.stack)
-        } else {
-            console.log('s3 item deleted', data);
-        }
+    return new Promise((resolve, reject) => {
+        const split = url.split('/');
+        const key = split[split.length-1];
+        const params = {
+            Bucket: S3_BUCKET,
+            Delete: {
+                Objects: [{
+                    Key: key,
+                }]
+            }
+        };
+        s3.deleteObjects(params, function(err, data) {
+            if (err) {
+                reject(console.error(err, err.stack));
+            } else {
+                resolve(console.log('s3 item deleted', data));
+            }
+        })
     })
-
 }
 
 module.exports = {s3Upload, s3Delete};
