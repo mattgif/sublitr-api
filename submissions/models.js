@@ -1,6 +1,26 @@
 const mongoose = require('mongoose');
 
-// TODO: coverletter
+const CommentSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true
+    },
+    authorID: {
+        type: String,
+        required: true
+    },
+    text: {
+        type: String,
+        required: true
+    },
+    date: {
+        type: Date,
+        required: true,
+        default: Date.now()
+    }
+});
+
+
 const SubmissionSchema = new mongoose.Schema({
     title: {
         type: String,
@@ -49,14 +69,8 @@ const SubmissionSchema = new mongoose.Schema({
             required: true,
             default: Date.now()
         },
-        comments: [{
-            name: String,
-            authorID: String,
-            date: Date,
-            text: String
-        }]
+        comments: [CommentSchema]
     }
-
 });
 
 SubmissionSchema.methods.serialize = function(editor) {

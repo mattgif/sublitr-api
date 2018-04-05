@@ -4,14 +4,10 @@ const chaiHttp = require('chai-http');
 const jwt = require('jsonwebtoken');
 const faker = require('faker');
 const fs = require('fs');
-const sinon = require('sinon');
-
 
 const {app, runServer, closeServer} = require('../server');
 const {TEST_DATABASE_URL, JWT_SECRET} = require('../config');
 const {Submission} = require('../submissions/models');
-const {submissionRouter} = require('../submissions/router');
-const awsHandler = require('../submissions/aws-handler');
 
 const expect = chai.expect;
 
@@ -441,7 +437,8 @@ describe('submissions API', () => {
         });
 
         it.skip('should reject a submission with non string publication', () => {
-            // TODO: new test; field() coverts argument to string
+            // TODO: field() coverts argument to string, so this should and does pass
+            // Need to pass endpoint a non-string somehow
             return chai.request(app)
                 .post('/api/submissions')
                 .field('title', faker.lorem.words())
@@ -459,7 +456,8 @@ describe('submissions API', () => {
         });
 
         it.skip('should reject a submission with non string title', () => {
-            // TODO: new test; field() converts argument to string
+            // TODO: field() coverts argument to string, so this should and does pass
+            // Need to pass endpoint a non-string somehow
             const nonStringTitle = {
                 title: 325,
                 publication: faker.lorem.words(),
@@ -483,7 +481,8 @@ describe('submissions API', () => {
         });
 
         it.skip('should reject a submission with a non string cover letter', () => {
-            // need new test - field converts argument to string 
+            // TODO: field() coverts argument to string, so this should and does pass
+            // Need to pass endpoint a non-string somehow
             return chai.request(app)
                 .post('/api/submissions')
                 .field('title', faker.lorem.words())
@@ -569,6 +568,7 @@ describe('submissions API', () => {
         });
 
         it.skip('should reject a submission with an attachment that is too large', () => {
+            // large doc kills the other tests; need more efficient test
             return chai.request(app)
                 .post('/api/submissions')
                 .field('title', faker.random.words())
@@ -582,6 +582,7 @@ describe('submissions API', () => {
         }).timeout(4000);
 
         it('should create a new submission', () => {
+            // skipping until we can figure out how to stub s3
             const coverLetter = faker.lorem.paragraphs();
             const fileName = 'spicer-extracts.pdf';
             // stub for s3 uploads
@@ -809,10 +810,10 @@ describe('submissions API', () => {
                         .then(res => {
                             expect(res).to.have.status(204);
                             return Submission.findById(submissionID)
-                        })
-                        .then(sub => {
-                            expect(sub.status).to.equal(newStatus);
-                            expect(sub.reviewerInfo.decision).to.equal(newStatus);
+                                .then(sub => {
+                                    expect(sub.status).to.equal(newStatus);
+                                    expect(sub.reviewerInfo.decision).to.equal(newStatus);
+                                })
                         })
                 })
         });
@@ -842,9 +843,9 @@ describe('submissions API', () => {
                         .then(res => {
                             expect(res).to.have.status(204);
                             return Submission.findById(submissionID)
-                        })
-                        .then(sub => {
-                            expect(sub.reviewerInfo.recommendation).to.equal(newStatus);
+                                .then(sub => {
+                                    expect(sub.reviewerInfo.recommendation).to.equal(newStatus);
+                                })
                         })
                 })
         });
@@ -905,22 +906,22 @@ describe('submissions API', () => {
                         .then(res => {
                             expect(res).to.have.status(204);
                             return Submission.findById(submissionID)
-                        })
-                        .then(sub => {
-                            expect(sub.reviewerInfo.comments).to.be.an('array');
-                            expect(sub.reviewerInfo.comments).to.have.length(1);
-                            const comment = sub.reviewerInfo.comments[0];
-                            expect(comment.name).to.equal(`${editorFirst} ${editorLast}`);
-                            expect(comment.text).to.equal(newComment.text);
-                            expect(comment.authorID).to.equal(editorID);
-                            expect('date' in comment).to.be.true;
+                                .then(sub => {
+                                    expect(sub.reviewerInfo.comments).to.be.an('array');
+                                    expect(sub.reviewerInfo.comments).to.have.length(1);
+                                    const comment = sub.reviewerInfo.comments[0];
+                                    expect(comment.name).to.equal(`${editorFirst} ${editorLast}`);
+                                    expect(comment.text).to.equal(newComment.text);
+                                    expect(comment.authorID).to.equal(editorID);
+                                    expect('date' in comment).to.be.true;
+                                })
                         })
                 })
         });
 
         it('should add an additional comment', () => {
             const newComment = {
-                text: faker.random.words()
+                text: 'look, a new comment!'
             };
 
             const oldComments = [
@@ -949,15 +950,16 @@ describe('submissions API', () => {
                         .then(res => {
                             expect(res).to.have.status(204);
                             return Submission.findById(submissionID)
-                        })
-                        .then(sub => {
-                            expect(sub.reviewerInfo.comments).to.be.an('array');
-                            expect(sub.reviewerInfo.comments).to.have.length(oldComments.length + 1);
-                            const comment = sub.reviewerInfo.comments.find(comment => comment.authorID === editorID);
-                            expect(comment).to.exist;
-                            expect(comment.name).to.equal(`${editorFirst} ${editorLast}`);
-                            expect(comment.text).to.equal(newComment.text);
-                            expect('date' in comment).to.be.true;
+                                .then(sub => {
+                                    console.log(sub.reviewerInfo.comments);
+                                    expect(sub.reviewerInfo.comments).to.be.an('array');
+                                    expect(sub.reviewerInfo.comments).to.have.length(oldComments.length + 1);
+                                    const comment = sub.reviewerInfo.comments.find(comment => comment.authorID === editorID);
+                                    expect(comment).to.exist;
+                                    expect(comment.name).to.equal(`${editorFirst} ${editorLast}`);
+                                    expect(comment.text).to.equal(newComment.text);
+                                    expect('date' in comment).to.be.true;
+                                })
                         })
                 });
         });
@@ -1050,7 +1052,7 @@ describe('submissions API', () => {
                         .then(res => {
                             expect(res).to.have.status(204);
                             Submission.findById(submissionID)
-                                .then((sub) => expect(sub).to.be.undefined)
+                                .then((sub) => expect(sub).to.be.null)
                         })
                 });
         });

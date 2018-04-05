@@ -30,9 +30,23 @@ function tearDownDb() {
     return mongoose.connection.dropDatabase();
 }
 
-function seedDb() {
-    let fakeUsers = [];
-    for (let i=0; i<NUM_FAKE_USERS; i++) {
+const email = 'user@example.com';
+const firstName = 'Testy';
+const lastName = 'Testman';
+let userID;
+
+function seedDb(NUM_FAKE_USERS) {
+    let count = NUM_FAKE_USERS;
+    const fakeUsers = [];
+    // create one known user
+    fakeUsers.push({
+        email,
+        firstName,
+        lastName,
+        password: faker.internet.password()
+    });
+    count --;
+    for (let i=0; i<count; i++) {
         fakeUsers.push({
             email: faker.internet.email(),
             firstName: faker.name.firstName(),
@@ -41,12 +55,20 @@ function seedDb() {
             editor: Math.random() < .5
         })
     }
-    return User.insertMany(fakeUsers);
+    return User.insertMany(fakeUsers)
+        .then(() => {
+            return User.findOne({email})
+                .then(user => userID = user._id.toString());
+        });
 }
 
 describe('users API', () => {
     before(function() {
         return runServer(TEST_DATABASE_URL);
+    });
+
+    beforeEach(function() {
+        return seedDb(NUM_FAKE_USERS);
     });
 
     afterEach(function() {
@@ -334,22 +356,6 @@ describe('users API', () => {
     });
 
     describe('PUT endpoint', () => {
-        // afterEach(function() {
-        //     return tearDownDb();
-        // });
-        const email = 'user@example.com';
-        const password = 'passtest123';
-        const firstName = 'Testy';
-        const lastName = 'Testman';
-        // user.id is generated from mongodb _id, so needs to be reset with each instance
-        let userID;
-
-        // create valid user to update
-        beforeEach(function () {
-            return User.hashPassword(password).then(password =>
-                User.create({email,firstName,lastName,password}))
-                .then(user => userID = user.id);
-        });
 
         describe('auth checks', () => {
             it('should reject anonymous requests', () => {
@@ -513,25 +519,6 @@ describe('users API', () => {
     });
 
     describe('DELETE endpoint', () => {
-        const email = 'user@example.com';
-        const userPassword = 'passtest123';
-        const firstName = 'Testy';
-        const lastName = 'Testman';
-        let userID;
-
-        beforeEach(function () {
-            return User
-                .hashPassword(userPassword)
-                .then(password => {
-                    return User.create({
-                        email,
-                        password,
-                        firstName,
-                        lastName
-                    })
-                })
-                .then(user => userID = user.id)
-        });
 
         describe('auth checks', () => {
             it('should reject anonymous requests', () => {
@@ -668,20 +655,6 @@ describe('users API', () => {
     });
 
     describe('GET endpoint for specfic user', () => {
-        const email = 'user@example.com';
-        const password = 'passtest123';
-        const firstName = 'Testy';
-        const lastName = 'Testman';
-        // user.id is generated from mongodb _id, so needs to be reset with each instance
-        let userID;
-
-        // create valid user to update
-        beforeEach(function () {
-            return User.hashPassword(password).then(password =>
-                User.create({email,firstName,lastName,password}))
-                .then(user => userID = user.id);
-        });
-
         describe('auth checks', () => {
             it('should reject anonymous requests', () => {
                 return chai.request(app)
@@ -850,16 +823,7 @@ describe('users API', () => {
         });
     });
 
-    describe('GET endpoint for all users', () => {
-        beforeEach(function() {
-            seedDb();
-        });
-
-        const email = 'user@example.com';
-        const firstName = 'Testy';
-        const lastName = 'Testman';
-        const userID = 'aaaaaaaaa';
-
+    describe('GET endpoint, generic request', () => {
         describe('auth checks', () => {
             it('should reject anonymous requests', () => {
                 return chai.request(app)
@@ -924,33 +888,34 @@ describe('users API', () => {
                     })
             });
 
-            it('should reject requests from non-admin users', () => {
-                const token = jwt.sign(
-                    {
-                        user: {
-                            email,
-                            firstName,
-                            lastName,
-                            admin: false,
-                            editor: false,
-                            id: userID
-                        }
-                    },
-                    JWT_SECRET,
-                    {
-                        algorithm: 'HS256',
-                        subject: email,
-                        expiresIn: '7d'
+        });
+        it('should return own profile for requests from non-admin users', () => {
+            const token = jwt.sign({
+                    user: {
+                        email,
+                        firstName,
+                        lastName,
+                        admin: false,
+                        editor: false,
+                        id: userID
                     }
-                );
-
-                return chai.request(app)
-                    .get(`/api/users/`)
-                    .set('authorization', `Bearer ${token}`)
-                    .then(res => {
-                        expect(res).to.have.status(401);
-                    })
-            })
+                },
+                JWT_SECRET,
+                {
+                    algorithm: 'HS256',
+                    subject: email,
+                    expiresIn: '7d'
+                });
+            return chai.request(app)
+                .get(`/api/users/`)
+                .set('authorization', `Bearer ${token}`)
+                .then(res => {
+                    expect(res).to.have.status(200);
+                    expect(res).to.be.json;
+                    expect(res.body.user).to.be.an('object');
+                    expect(res.body.user.email).to.equal(email);
+                    expect(res.body.user.id).to.equal(userID);
+                })
         });
 
         it('should return list of all users if requester is admin', () => {
@@ -966,7 +931,7 @@ describe('users API', () => {
                         lastName: adminLast,
                         admin: true,
                         editor: false,
-                        id: 'whatever'
+                        id: userID
                     }
                 },
                 JWT_SECRET,
@@ -982,12 +947,15 @@ describe('users API', () => {
                 .then(res => {
                     expect(res).to.have.status(200);
                     expect(res).to.be.json;
-                    expect(res.body).to.be.an('array');
-                    expect(res.body).to.have.lengthOf(NUM_FAKE_USERS);
+                    expect(res.body).to.be.an('object');
+                    expect(res.body.userList).to.be.an('array');
+                    expect(res.body.userList).to.have.lengthOf(NUM_FAKE_USERS);
                     ['email', 'firstName', 'lastName', 'admin', 'editor'].forEach(field => {
-                        expect(field in res.body[0]).to.be.true;
+                        expect(field in res.body.userList[0]).to.be.true;
                     });
-                    expect('password' in res.body[0]).to.be.false;
+                    expect('password' in res.body.userList[0]).to.be.false;
+                    expect(res.body.user).to.be.an('object');
+                    expect(res.body.user.id).to.equal(userID);
                 })
         });
     });

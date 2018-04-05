@@ -176,15 +176,16 @@ router.put('/:id/comment', (req, res) => {
     const comment = {
         name: `${req.user.firstName} ${req.user.lastName}`,
         authorID: req.user.id,
-        date: Date.now(),
         text: req.body.text.trim()
     };
+
+    console.log('comment received:', comment);
 
     Submission.findById(req.params.id)
         .then(submission => {
             submission.reviewerInfo.comments.push(comment);
             submission.save()
-            res.status(204).json({message: `${req.params.id} updated`})
+                .then(res.status(204).json({ok: true, message: `${req.params.id} updated`}))
         })
         .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
 });
@@ -227,7 +228,7 @@ router.put('/:id', (req, res) => {
     updatedSubmission.reviewerInfo = updateReq;
 
     Submission.findByIdAndUpdate(req.params.id, updatedSubmission)
-        .then(res.status(204).json({message: `${req.params.id} updated`}))
+        .then(updated => res.status(204).json({ok: true, message: `${updated._id} updated`}))
         .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
 });
 

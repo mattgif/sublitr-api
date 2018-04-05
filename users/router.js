@@ -13,19 +13,22 @@ router.use(jsonParser);
 router.get('/', jwtAuth, (req, res) => {
     // check for admin privileges
     if (!req.user.admin) {
-        return res.status(401).json({
-            code: 401,
-            reason: 'AuthenticationError',
-            message: 'Not admin'
-        })
+        // redirect so users can get their own profile
+        return User.findById(req.user.id)
+            .then(user => {
+                return res.status(200).json({user: user.serialize()})
+            })
+            .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
     }
 
     User.find({})
         .then(users => {
             const serializedUsers = users.map(user => user.serialize());
-            res.status(200).json(serializedUsers)
+            let thisUser = users.find(user => user.id === req.user.id);
+            thisUser = thisUser.serialize();
+            return res.status(200).json({user: thisUser, userList: serializedUsers})
         })
-        .catch(console.error)
+        .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
 });
 
 router.get('/:id', jwtAuth, (req, res) => {
@@ -130,7 +133,7 @@ router.post('/', (req, res) => {
     lastName = lastName.trim();
 
     return User.find({email})
-        // Check if user w/that email is already in the db
+    // Check if user w/that email is already in the db
         .count()
         .then(count => {
             if (count > 0) {
@@ -154,7 +157,7 @@ router.post('/', (req, res) => {
             });
         })
         .then(user => {
-           return res.status(201).json(user.serialize());
+            return res.status(201).json(user.serialize());
         })
         .catch(err => {
             if (err.reason === 'ValidationError') {
@@ -194,7 +197,7 @@ router.put('/:id', jwtAuth, (req, res) => {
 });
 
 router.delete('/:id', jwtAuth, (req, res) => {
-    if (!((req.user.id === req.params.id) || req.user.admin)) {
+    if (!req.user.admin && (req.user.id !== req.params.id)) {
         // user is a valid user, but neither an admin, nor the user they're trying to delete
         return res.status(401).json({
             code: 401,
@@ -206,10 +209,10 @@ router.delete('/:id', jwtAuth, (req, res) => {
     User.findById(req.params.id)
         .then(user => {
             user.remove()
-        })
-        .then(() => {
-            console.log(`Deleted user with id ${req.params.id}`);
-            res.status(204).end()
+                .then(() => {
+                    console.log(`Deleted user with id ${req.params.id}`);
+                    res.status(204).end()
+                })
         })
 });
 
