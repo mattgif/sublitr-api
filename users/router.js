@@ -14,19 +14,17 @@ router.get('/', jwtAuth, (req, res) => {
     // check for admin privileges
     if (!req.user.admin) {
         // redirect so users can get their own profile
-        return User.findById(req.user.id)
-            .then(user => {
-                return res.status(200).json({user: user.serialize()})
-            })
-            .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
+        return res.status(401).json({
+            code: 401,
+            reason: 'AuthenticationError',
+            message: 'Not authorized to view user list'
+        })
     }
 
     User.find({})
         .then(users => {
             const serializedUsers = users.map(user => user.serialize());
-            let thisUser = users.find(user => user.id === req.user.id);
-            thisUser = thisUser.serialize();
-            return res.status(200).json({user: thisUser, userList: serializedUsers})
+            return res.status(200).json({userList: serializedUsers})
         })
         .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
 });

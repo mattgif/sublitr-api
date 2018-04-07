@@ -20,11 +20,12 @@ const {localStrategy, jwtStrategy} = require('./auth/strategies');
 
 const app = express();
 
-// app.use(morgan('common'));
+app.use(morgan('common'));
 
+// TODO: remove localhost for production
 app.use(
     cors({
-        origin: CLIENT_ORIGIN
+        origin: [CLIENT_ORIGIN, 'http://localhost:8080']
     })
 );
 

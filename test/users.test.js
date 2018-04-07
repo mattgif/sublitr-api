@@ -889,7 +889,8 @@ describe('users API', () => {
             });
 
         });
-        it('should return own profile for requests from non-admin users', () => {
+        it.skip('should return own profile for requests from non-admin users', () => {
+            // redundant with JWT architecture
             const token = jwt.sign({
                     user: {
                         email,
@@ -915,6 +916,31 @@ describe('users API', () => {
                     expect(res.body.user).to.be.an('object');
                     expect(res.body.user.email).to.equal(email);
                     expect(res.body.user.id).to.equal(userID);
+                })
+        });
+
+        it('should not allow non-admins to view user list', () => {
+            const token = jwt.sign({
+                    user: {
+                        email,
+                        firstName,
+                        lastName,
+                        admin: false,
+                        editor: false,
+                        id: userID
+                    }
+                },
+                JWT_SECRET,
+                {
+                    algorithm: 'HS256',
+                    subject: email,
+                    expiresIn: '7d'
+                });
+            return chai.request(app)
+                .get(`/api/users/`)
+                .set('authorization', `Bearer ${token}`)
+                .then(res => {
+                    expect(res).to.have.status(401);
                 })
         });
 
@@ -954,8 +980,6 @@ describe('users API', () => {
                         expect(field in res.body.userList[0]).to.be.true;
                     });
                     expect('password' in res.body.userList[0]).to.be.false;
-                    expect(res.body.user).to.be.an('object');
-                    expect(res.body.user.id).to.equal(userID);
                 })
         });
     });
