@@ -13,7 +13,10 @@ chai.use(chaiHttp);
 function seedDb(NUM_OF_PUBS) {
     const pubs = [];
     for(let i=0; i<NUM_OF_PUBS; i++) {
-        pubs.push({title: faker.random.words()})
+        pubs.push({
+            title: faker.random.words(),
+            abbr: faker.random.uuid()
+        })
     }
     return Publication.insertMany(pubs);
 }
