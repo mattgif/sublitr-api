@@ -25,11 +25,6 @@ function generateNewUser() {
     }
 }
 
-// tear down for afterEach block
-function tearDownDb() {
-    return mongoose.connection.dropDatabase();
-}
-
 const email = 'user@example.com';
 const firstName = 'Testy';
 const lastName = 'Testman';
