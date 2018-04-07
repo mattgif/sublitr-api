@@ -23,8 +23,7 @@ router.get('/', jwtAuth, (req, res) => {
 
     User.find({})
         .then(users => {
-            const serializedUsers = users.map(user => user.serialize());
-            return res.status(200).json({userList: serializedUsers})
+            return res.status(200).json(users.map(user => user.serialize()))
         })
         .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
 });

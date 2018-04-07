@@ -973,13 +973,12 @@ describe('users API', () => {
                 .then(res => {
                     expect(res).to.have.status(200);
                     expect(res).to.be.json;
-                    expect(res.body).to.be.an('object');
-                    expect(res.body.userList).to.be.an('array');
-                    expect(res.body.userList).to.have.lengthOf(NUM_FAKE_USERS);
+                    expect(res.body).to.be.an('array');
+                    expect(res.body).to.have.lengthOf(NUM_FAKE_USERS);
                     ['email', 'firstName', 'lastName', 'admin', 'editor'].forEach(field => {
-                        expect(field in res.body.userList[0]).to.be.true;
+                        expect(field in res.body[0]).to.be.true;
                     });
-                    expect('password' in res.body.userList[0]).to.be.false;
+                    expect('password' in res.body[0]).to.be.false;
                 })
         });
     });
