@@ -11,7 +11,7 @@ const s3 = new aws.S3();
 
 function s3Upload(fileInfo) {
     // fileInfo: object with k/v pairs for 'Key', 'Body' (the file itself), and 'ContentType' (e.g. pdf).
-    // returns url of object on s3 server
+    // returns key of object on s3 server
     return new Promise((resolve, reject) => {
         const requiredKeys = ['Key', 'Body', 'ContentType'];
         const missingKey = requiredKeys.find(keyField => !(keyField in fileInfo));
@@ -23,7 +23,6 @@ function s3Upload(fileInfo) {
                 location: missingKey
             })
         }
-        const url = `https://s3.amazonaws.com/sublitr/${fileInfo.Key}`;
         const params = Object.assign({}, fileInfo, {
             "Bucket": S3_BUCKET,
             "ACL": "bucket-owner-full-control"
@@ -34,7 +33,7 @@ function s3Upload(fileInfo) {
                 reject(console.error(err, err.stack));
             }
         });
-        resolve(url);
+        resolve(fileInfo.Key);
     })
 }
 
@@ -61,4 +60,23 @@ function s3Delete(url) {
     })
 }
 
-module.exports = {s3Upload, s3Delete};
+function s3Get(key) {
+    return new Promise((resolve, reject) => {
+        const params = {
+            "Bucket": S3_BUCKET,
+            "Key": key
+        };
+        let res = 'you shouldn\'t see this';
+        s3.headObject(params, function(err, data) {
+            if (err) {reject(console.error(err, err.stack));}
+            resolve({
+                getStream: () => {return s3.getObject(params).createReadStream()},
+                data
+            });
+        })
+    })
+        .catch(console.error)
+}
+
+
+module.exports = {s3Upload, s3Delete, s3Get};

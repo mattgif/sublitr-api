@@ -44,8 +44,6 @@ router.get('/:id', jwtAuth, (req, res) => {
 });
 
 router.post('/', (req, res) => {
-    // Register a new user
-
     // Check to make sure all required fields are present
     const requiredFields = ['email', 'firstName', 'lastName', 'password'];
     const missingField = requiredFields.find(field => !(field in req.body));

@@ -2,10 +2,11 @@ const express = require('express');
 const passport = require('passport');
 const bodyParser = require('body-parser');
 const fileUpload = require('express-fileupload');
+const mime = require('mime-types');
 const fs = require('fs');
 
 const {Submission} = require('../submissions/models');
-const {s3Upload, s3Delete} = require('./aws-handler');
+const {s3Upload, s3Delete, s3Get} = require('./aws-handler');
 
 const router = express.Router();
 
@@ -51,7 +52,6 @@ router.get('/:submissionID', (req, res) => {
                     message: 'Not authorized to view submission'
                 })
             }
-
             res.status(200).json(submission.serialize(adminOrAuthor))
         })
         .catch(err => {
@@ -62,97 +62,122 @@ router.get('/:submissionID', (req, res) => {
         })
 });
 
+router.get('/:submissionID/:key', (req, res) => {
+    Submission.findById(req.params.submissionID).then(sub => {
+        if (!req.user.admin && !req.user.editor && req.user.id !== sub.authoriD) {
+            return Promise.reject({
+                code: 401,
+                reason: 'AuthenticationError',
+                message: 'Not authorized to view submission'
+            })
+        }
+        const key = req.params.key;
+        s3Get(key).then(s3response => {
+            const {getStream, data} = s3response;
+            const stream = getStream();
+            res.set('Content-Type', mime.lookup(key));
+            res.set('Content-Length', data.ContentLength);
+            res.set('Last-Modified', data.LastModified);
+            res.set('ETag', data.ETag);
+            stream.pipe(res)
+        })
+    })
+        .catch(console.error)
+        //.catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
+});
+
 router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload({ limits: { fileSize: MAX_FILE_SIZE } , abortOnLimit: true})], (req, res) => {
-        // Check for missing fields
-        const requiredFields = ['title', 'publication'];
-        const missingField = requiredFields.find(field => !(field in req.body));
-        if (missingField) {
-            return res.status(422).json({
-                code: 422,
-                reason: 'ValidationError',
-                message: 'Missing field',
-                location: missingField
-            })
-        }
+    // Check for missing fields
+    const requiredFields = ['title', 'publication'];
+    const missingField = requiredFields.find(field => !(field in req.body));
+    if (missingField) {
+        return res.status(422).json({
+            code: 422,
+            reason: 'ValidationError',
+            message: 'Missing field',
+            location: missingField
+        })
+    }
 
-        if (!req.files) {
-            return res.status(422).json({
-                code: 422,
-                reason: 'ValidationError',
-                message: 'Missing field',
-                location: 'doc'
-            })
-        }
-        // Check that each field is the correct type
-        const stringFields = ['title', 'publication', 'coverLetter'];
-        const nonStringField = stringFields.find(field => (field in req.body) && !(typeof req.body[field] === 'string'));
-        if (nonStringField) {
-            return res.status(422).json({
-                code: 422,
-                reason: 'ValidationError',
-                message: `${nonStringField} must be a string`,
-                location: nonStringField
-            })
-        }
+    if (!req.files) {
+        return res.status(422).json({
+            code: 422,
+            reason: 'ValidationError',
+            message: 'Missing field',
+            location: 'doc'
+        })
+    }
 
-        const acceptedFileTypes = ['application/pdf'];
-        if (!(acceptedFileTypes.includes(req.files.doc.mimetype))) {
-            return res.status(422).json({
-                code: 422,
-                reason: 'ValidationError',
-                message: `Invalid file type`,
-                location: 'doc'
-            })
-        }
+    // Check that each field is the correct type
+    const stringFields = ['title', 'publication', 'coverLetter'];
+    const nonStringField = stringFields.find(field => (field in req.body) && !(typeof req.body[field] === 'string'));
+    if (nonStringField) {
+        return res.status(422).json({
+            code: 422,
+            reason: 'ValidationError',
+            message: `${nonStringField} must be a string`,
+            location: nonStringField
+        })
+    }
 
-        // Check that fields meet length requirements
-        const sizedFields = {
-            title: {min: 1, max: 128},
-            coverLetter: {max: 3000}
-        };
+    const acceptedFileTypes = ['application/pdf'];
+    if (!(acceptedFileTypes.includes(req.files.doc.mimetype))) {
+        return res.status(422).json({
+            code: 422,
+            reason: 'ValidationError',
+            message: `Invalid file type`,
+            location: 'doc'
+        })
+    }
 
-        const tooSmallField = Object.keys(sizedFields).find(field =>
-            'min' in sizedFields[field]
-            && field in req.body
-            && (req.body[field].trim().length < sizedFields[field].min)
-        );
+    // Check that fields meet length requirements
+    const sizedFields = {
+        title: {min: 1, max: 128},
+        coverLetter: {max: 3000}
+    };
 
-        const tooLargeField = Object.keys(sizedFields).find(field =>
-            'max' in sizedFields[field]
-            && field in req.body
-            && req.body[field].trim().length > sizedFields[field].max
-        );
+    const tooSmallField = Object.keys(sizedFields).find(field =>
+        'min' in sizedFields[field]
+        && field in req.body
+        && (req.body[field].trim().length < sizedFields[field].min)
+    );
 
-        if (tooLargeField || tooSmallField) {
-            return res.status(422).json({
-                code: 422,
-                reason: 'ValidationError',
-                message: tooLargeField ? `Can't be more than ${sizedFields[tooLargeField].max} characters long`
-                    : `Must be at least ${sizedFields[tooSmallField].min} characters long`,
-                location: tooLargeField || tooSmallField
-            })
-        }
+    const tooLargeField = Object.keys(sizedFields).find(field =>
+        'max' in sizedFields[field]
+        && field in req.body
+        && req.body[field].trim().length > sizedFields[field].max
+    );
 
-        // upload the submission to s3 and get the url
-        s3Upload({
-            Key: `${req.user.id}-${req.files.doc.name}`,
-            Body: req.files.doc.data,
-            ContentType: req.files.doc.mimetype
-        }).then(submissionURL => {
-            Submission.create(
-                {
-                    title: req.body.title,
-                    author: `${req.user.firstName} ${req.user.lastName}`,
-                    authorID: req.user.id,
-                    publication: req.body.publication,
-                    coverLetter: req.body.coverLetter,
-                    file: submissionURL
-                }
-            ).then(sub => {
-                return res.status(201).json(sub.serialize((req.user.admin || req.user.editor)))
-            })
-        }).catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
-    });
+    if (tooLargeField || tooSmallField) {
+        return res.status(422).json({
+            code: 422,
+            reason: 'ValidationError',
+            message: tooLargeField ? `Can't be more than ${sizedFields[tooLargeField].max} characters long`
+                : `Must be at least ${sizedFields[tooSmallField].min} characters long`,
+            location: tooLargeField || tooSmallField
+        })
+    }
+
+    // upload the submission to s3 and get the url
+    s3Upload({
+        Key: `${req.user.id}-${req.files.doc.name}`,
+        Body: req.files.doc.data,
+        ContentType: req.files.doc.mimetype
+    }).then(fileName => {
+        Submission.create(
+            {
+                title: req.body.title,
+                author: `${req.user.firstName} ${req.user.lastName}`,
+                authorID: req.user.id,
+                publication: req.body.publication,
+                coverLetter: req.body.coverLetter,
+                file: fileName
+            }
+        ).then(sub => {
+            return res.status(201).json(sub.serialize((req.user.admin || req.user.editor)))
+        })
+    }).catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
+});
 
 router.put('/:id/comment', (req, res) => {
     if (!(req.user.admin || req.user.editor)) {
@@ -191,6 +216,7 @@ router.put('/:id/comment', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
+    console.log(req.body)
     if (!req.user.admin && !req.user.editor) {
         return res.status(401).json({
             code: 401,
