@@ -217,7 +217,6 @@ router.post('/:id/comment', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
-    console.log(req.body)
     if (!req.user.admin && !req.user.editor) {
         return res.status(401).json({
             code: 401,
@@ -234,11 +233,8 @@ router.put('/:id', (req, res) => {
         })
     }
 
-    const updateReq = req.body.reviewerInfo;
-    const updatedSubmission = {};
-
     const stringFields = ['decision', 'recommendation'];
-    const nonStringField = stringFields.find(field => (field in updateReq) && !(typeof updateReq[field] === 'string'));
+    const nonStringField = stringFields.find(field => (field in req.body.reviewerInfo) && (typeof req.body.reviewerInfo[field] !== 'string'));
     if (nonStringField) {
         return res.status(422).json({
             code: 422,
@@ -248,14 +244,15 @@ router.put('/:id', (req, res) => {
         })
     }
 
-    // update status when decision changes
-    if ('decision' in updateReq) {
-        updatedSubmission.status = updateReq['decision']
-    }
-    updatedSubmission.reviewerInfo = updateReq;
-
-    Submission.findByIdAndUpdate(req.params.id, updatedSubmission)
-        .then(updated => res.status(204).json({ok: true, message: `${updated._id} updated`}))
+    Submission.findById(req.params.id)
+        .then(sub => {
+            for (let key in req.body.reviewerInfo) {
+                sub.reviewerInfo[key] = req.body.reviewerInfo[key]
+            }
+            sub.status = sub.reviewerInfo.decision;
+            sub.save()
+                .then(updated => res.status(204).json({ok: true, message: `${updated._id} updated`}))
+        })
         .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
 });
 

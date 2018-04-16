@@ -964,7 +964,6 @@ describe('submissions API', () => {
                             expect(res.body.authorID).to.equal(editorID);
                             return Submission.findById(submissionID)
                                 .then(sub => {
-                                    console.log(sub.reviewerInfo.comments);
                                     expect(sub.reviewerInfo.comments).to.be.an('array');
                                     expect(sub.reviewerInfo.comments).to.have.length(oldComments.length + 1);
                                     const comment = sub.reviewerInfo.comments.find(comment => comment.authorID === editorID);
