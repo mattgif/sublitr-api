@@ -217,6 +217,7 @@ router.post('/:id/comment', (req, res) => {
 });
 
 router.delete('/:id/comment/:commentId', (req, res) => {
+    console.log(req.body);
     Submission.findById(req.params.id)
         .then(sub => {
             const targetComment = sub.reviewerInfo.comments.id(req.params.commentId);
@@ -227,12 +228,20 @@ router.delete('/:id/comment/:commentId', (req, res) => {
                     message: 'Not authorized to delete comment'
                 })
             }
+
+            if (req.body.submissionId !== sub._id.toString() || req.body.commentId !== targetComment._id.toString()) {
+                return Promise.reject({
+                    code: 400,
+                    reason: 'Mismatch',
+                    message: 'Submission or Comment ID incorrect'
+                })
+            }
             targetComment.remove();
             sub.save()
                 .then(() => res.status(204).json({ok: true}))
         })
         .catch(err => {
-            if (err.reason === 'AuthenticationError') {
+            if (err.reason === 'AuthenticationError' || err.reason === 'Mismatch') {
                 return res.status(err.code).json(err);
             }
             res.status(500).json({code: 500, message: 'Internal server error'})

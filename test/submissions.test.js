@@ -1091,6 +1091,10 @@ describe('submissions API', () => {
                             commentId = res.body._id;
                             return chai.request(app)
                                 .delete(`/api/submissions/${submissionID}/comment/${commentId}`)
+                                .send({
+                                    submissionId: submissionID,
+                                    commentId
+                                })
                                 .set('authorization', `Bearer ${adminToken}`)
                                 .then(res => expect(res).to.have.status(204))
                         })
