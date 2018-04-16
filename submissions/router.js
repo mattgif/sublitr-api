@@ -216,6 +216,29 @@ router.post('/:id/comment', (req, res) => {
         .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
 });
 
+router.delete('/:id/comment/:commentId', (req, res) => {
+    Submission.findById(req.params.id)
+        .then(sub => {
+            const targetComment = sub.reviewerInfo.comments.id(req.params.commentId);
+            if (!(req.user.admin) && req.user.id !== targetComment.authorID) {
+                return Promise.reject({
+                    code: 401,
+                    reason: 'AuthenticationError',
+                    message: 'Not authorized to delete comment'
+                })
+            }
+            targetComment.remove();
+            sub.save()
+                .then(() => res.status(204).json({ok: true}))
+        })
+        .catch(err => {
+            if (err.reason === 'AuthenticationError') {
+                return res.status(err.code).json(err);
+            }
+            res.status(500).json({code: 500, message: 'Internal server error'})
+        })
+});
+
 router.put('/:id', (req, res) => {
     if (!req.user.admin && !req.user.editor) {
         return res.status(401).json({

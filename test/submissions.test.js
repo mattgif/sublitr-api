@@ -1069,5 +1069,33 @@ describe('submissions API', () => {
                         })
                 });
         });
-    })
+    });
+
+    describe('DELETE comment endpoint', () => {
+        it('should delete a comment', () => {
+            const newComment = {
+                text: faker.random.words()
+            };
+
+            let commentId;
+            return chai.request(app)
+                .get('/api/submissions')
+                .set('authorization', `Bearer ${adminToken}`)
+                .then(res => {
+                    const submissionID = res.body[0].id;
+                    return chai.request(app)
+                        .post(`/api/submissions/${submissionID}/comment`)
+                        .send(newComment)
+                        .set('authorization', `Bearer ${editorToken}`)
+                        .then(res => {
+                            commentId = res.body._id;
+                            return chai.request(app)
+                                .delete(`/api/submissions/${submissionID}/comment/${commentId}`)
+                                .set('authorization', `Bearer ${adminToken}`)
+                                .then(res => expect(res).to.have.status(204))
+                        })
+                    })
+            })
+
+    });
 });
