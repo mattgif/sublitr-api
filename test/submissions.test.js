@@ -603,7 +603,7 @@ describe('submissions API', () => {
                     expect(res.body.author).to.equal(`${userFirst} ${userLast}`);
                     expect(res.body.authorID).to.equal(userID);
                     expect(res.body.coverLetter).to.equal(coverLetter);
-                    expect(res.body.file).to.equal(`https://s3.amazonaws.com/sublitr/${userID}-${fileName}`);
+                    expect(res.body.file).to.equal(`${userID}-${fileName}`);
                     // sinon.assert.calledOnce(s3UploadStub);
                 })
         })
@@ -851,7 +851,7 @@ describe('submissions API', () => {
         });
     });
 
-    describe('PUT comment endpoint', () => {
+    describe('POST comment endpoint', () => {
         it('should reject requests from non-editor/admin users', () => {
             const comment = {text: faker.random.words()};
             return chai.request(app)
@@ -859,7 +859,7 @@ describe('submissions API', () => {
                 .set('authorization', `Bearer ${adminToken}`)
                 .then(res => {
                     return chai.request(app)
-                        .put(`/api/submissions/${res.body[0].id}/comment`)
+                        .post(`/api/submissions/${res.body[0].id}/comment`)
                         .send(comment)
                         .set('authorization', `Bearer ${userToken}`)
                         .then(res => expect(res).to.have.status(401))
@@ -876,7 +876,7 @@ describe('submissions API', () => {
                 .set('authorization', `Bearer ${adminToken}`)
                 .then(res => {
                     return chai.request(app)
-                        .put(`/api/submissions/${res.body[0].id}/comment`)
+                        .post(`/api/submissions/${res.body[0].id}/comment`)
                         .send(newComment)
                         .set('authorization', `Bearer ${editorToken}`)
                         .then(res => {
@@ -900,17 +900,24 @@ describe('submissions API', () => {
                 .then(res => {
                     const submissionID = res.body[0].id;
                     return chai.request(app)
-                        .put(`/api/submissions/${submissionID}/comment`)
+                        .post(`/api/submissions/${submissionID}/comment`)
                         .send(newComment)
                         .set('authorization', `Bearer ${editorToken}`)
                         .then(res => {
-                            expect(res).to.have.status(204);
+                            expect(res).to.have.status(201);
+                            expect(res).to.be.json;
+                            expect(res.body).to.be.an('object');
+                            expect(res.body.firstName).to.equal(editorFirst);
+                            expect(res.body.lastName).to.equal(editorLast);
+                            expect(res.body.text).to.equal(newComment.text);
+                            expect(res.body.authorID).to.equal(editorID);
                             return Submission.findById(submissionID)
                                 .then(sub => {
                                     expect(sub.reviewerInfo.comments).to.be.an('array');
                                     expect(sub.reviewerInfo.comments).to.have.length(1);
                                     const comment = sub.reviewerInfo.comments[0];
-                                    expect(comment.name).to.equal(`${editorFirst} ${editorLast}`);
+                                    expect(comment.firstName).to.equal(editorFirst);
+                                    expect(comment.lastName).to.equal(editorLast);
                                     expect(comment.text).to.equal(newComment.text);
                                     expect(comment.authorID).to.equal(editorID);
                                     expect('date' in comment).to.be.true;
@@ -925,9 +932,9 @@ describe('submissions API', () => {
             };
 
             const oldComments = [
-                {name: 'Betty Brown', authorID: 'u222222', date: '2018-03-04 21:12', text: faker.lorem.paragraphs()},
-                {name: 'Abe Abrams', authorID: 'u111111', date: '2018-03-03 08:30', text: faker.lorem.paragraphs()},
-                {name: 'Debbie Douglas', authorID: 'u444444', date: '2018-03-03 08:00', text: faker.lorem.paragraphs()}
+                {lastName: 'Brown', firstName: 'Betty', authorID: 'u222222', date: '2018-03-04 21:12', text: faker.lorem.paragraphs()},
+                {lastName: 'Abrams', firstName: 'Abe', authorID: 'u111111', date: '2018-03-03 08:30', text: faker.lorem.paragraphs()},
+                {lastName: 'Douglas', firstName: 'Debbie', authorID: 'u444444', date: '2018-03-03 08:00', text: faker.lorem.paragraphs()}
             ];
 
             let submissionID;
@@ -944,11 +951,17 @@ describe('submissions API', () => {
                 })
                 .then(() => {
                     return chai.request(app)
-                        .put(`/api/submissions/${submissionID}/comment`)
+                        .post(`/api/submissions/${submissionID}/comment`)
                         .send(newComment)
                         .set('authorization', `Bearer ${editorToken}`)
                         .then(res => {
-                            expect(res).to.have.status(204);
+                            expect(res).to.have.status(201);
+                            expect(res).to.be.json;
+                            expect(res.body).to.be.an('object');
+                            expect(res.body.firstName).to.equal(editorFirst);
+                            expect(res.body.lastName).to.equal(editorLast);
+                            expect(res.body.text).to.equal(newComment.text);
+                            expect(res.body.authorID).to.equal(editorID);
                             return Submission.findById(submissionID)
                                 .then(sub => {
                                     console.log(sub.reviewerInfo.comments);
@@ -956,7 +969,8 @@ describe('submissions API', () => {
                                     expect(sub.reviewerInfo.comments).to.have.length(oldComments.length + 1);
                                     const comment = sub.reviewerInfo.comments.find(comment => comment.authorID === editorID);
                                     expect(comment).to.exist;
-                                    expect(comment.name).to.equal(`${editorFirst} ${editorLast}`);
+                                    expect(comment.firstName).to.equal(editorFirst);
+                                    expect(comment.lastName).to.equal(editorLast);
                                     expect(comment.text).to.equal(newComment.text);
                                     expect('date' in comment).to.be.true;
                                 })

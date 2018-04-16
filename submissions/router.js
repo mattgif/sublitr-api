@@ -179,7 +179,7 @@ router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload({ limits
     }).catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
 });
 
-router.put('/:id/comment', (req, res) => {
+router.post('/:id/comment', (req, res) => {
     if (!(req.user.admin || req.user.editor)) {
         return res.status(401).json({
             code: 401,
@@ -198,19 +198,20 @@ router.put('/:id/comment', (req, res) => {
         })
     }
 
+    const text = req.body.text.trim();
     const comment = {
-        name: `${req.user.firstName} ${req.user.lastName}`,
+        firstName: req.user.firstName,
+        lastName: req.user.lastName,
         authorID: req.user.id,
-        text: req.body.text.trim()
+        text
     };
-
-    console.log('comment received:', comment);
 
     Submission.findById(req.params.id)
         .then(submission => {
-            submission.reviewerInfo.comments.push(comment);
+            const newComment = submission.reviewerInfo.comments.create(comment);
+            submission.reviewerInfo.comments.push(newComment);
             submission.save()
-                .then(res.status(204).json({ok: true, message: `${req.params.id} updated`}))
+                .then(() => res.status(201).json(newComment._doc))
         })
         .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
 });
