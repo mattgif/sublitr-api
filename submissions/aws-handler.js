@@ -54,7 +54,7 @@ function s3Delete(url) {
             if (err) {
                 reject(console.error(err, err.stack));
             } else {
-                resolve(console.log('s3 item deleted', data));
+                resolve(data);
             }
         })
     })

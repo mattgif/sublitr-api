@@ -217,7 +217,6 @@ router.post('/:id/comment', (req, res) => {
 });
 
 router.delete('/:id/comment/:commentId', (req, res) => {
-    console.log(req.body);
     Submission.findById(req.params.id)
         .then(sub => {
             const targetComment = sub.reviewerInfo.comments.id(req.params.commentId);
