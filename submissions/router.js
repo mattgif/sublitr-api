@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const fileUpload = require('express-fileupload');
 const mime = require('mime-types');
 const fs = require('fs');
+const shortid = require('shortid');
 
 const {Submission} = require('../submissions/models');
 const {s3Upload, s3Delete, s3Get} = require('./aws-handler');
@@ -82,8 +83,7 @@ router.get('/:submissionID/:key', (req, res) => {
             stream.pipe(res)
         })
     })
-        .catch(console.error)
-        //.catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
+        .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
 });
 
 router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload({ limits: { fileSize: MAX_FILE_SIZE } , abortOnLimit: true})], (req, res) => {
@@ -161,7 +161,7 @@ router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload({ limits
 
     // upload the submission to s3 and get the url
     s3Upload({
-        Key: `${req.user.id}-${req.files.doc.name}`,
+        Key: `${shortid.generate()}-${req.files.doc.name}`,
         Body: req.files.doc.data,
         ContentType: req.files.doc.mimetype
     }).then(fileName => {

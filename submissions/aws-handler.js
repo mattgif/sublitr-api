@@ -66,16 +66,15 @@ function s3Get(key) {
             "Bucket": S3_BUCKET,
             "Key": key
         };
-        let res = 'you shouldn\'t see this';
         s3.headObject(params, function(err, data) {
-            if (err) {reject(console.error(err, err.stack));}
+            if (err) {return reject(console.error(err, err.stack));}
             resolve({
                 getStream: () => {return s3.getObject(params).createReadStream()},
                 data
             });
         })
+            .catch(err => reject(console.error(err, err.stack)))
     })
-        .catch(console.error)
 }
 
 

@@ -603,8 +603,6 @@ describe('submissions API', () => {
                     expect(res.body.author).to.equal(`${userFirst} ${userLast}`);
                     expect(res.body.authorID).to.equal(userID);
                     expect(res.body.coverLetter).to.equal(coverLetter);
-                    expect(res.body.file).to.equal(`${userID}-${fileName}`);
-                    // sinon.assert.calledOnce(s3UploadStub);
                 })
         })
     });
