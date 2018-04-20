@@ -87,6 +87,7 @@ router.get('/:submissionID/:key', (req, res) => {
 });
 
 router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload({ limits: { fileSize: MAX_FILE_SIZE } , abortOnLimit: true})], (req, res) => {
+    console.log(req.body)
     // Check for missing fields
     const requiredFields = ['title', 'publication'];
     const missingField = requiredFields.find(field => !(field in req.body));

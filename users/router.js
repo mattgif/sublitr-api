@@ -203,11 +203,25 @@ router.delete('/:id', jwtAuth, (req, res) => {
 
     User.findById(req.params.id)
         .then(user => {
+            if (user.admin) {
+                return Promise.reject({
+                    code: 403,
+                    reason: 'Forbidden',
+                    message: 'Admin accounts cannot be deleted',
+                    location: 'email'
+                })
+            }
             user.remove()
                 .then(() => {
                     console.log(`Deleted user with id ${req.params.id}`);
                     res.status(204).end()
                 })
+        })
+        .catch(err => {
+            if (err.reason === 'Forbidden') {
+                return res.status(err.code).json(err)
+            }
+            res.status(500).json({code: 500, message: 'Internal server error'})
         })
 });
 

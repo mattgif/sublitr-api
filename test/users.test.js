@@ -647,6 +647,39 @@ describe('users API', () => {
                     expect(count).to.equal(0)
                 })
         });
+
+        it('should reject request to delete admin', () => {
+            // find user, set to admin, then try to delete
+            const adminEmail = 'admin@example.com';
+            const token = jwt.sign(
+                {
+                    user: {
+                        email: adminEmail,
+                        firstName: 'Adam',
+                        lastName: 'Administratorman',
+                        admin: true,
+                        editor: false,
+                        id: 'whatever'
+                    }
+                },
+                JWT_SECRET,
+                {
+                    algorithm: 'HS256',
+                    subject: adminEmail,
+                    expiresIn: '7d'
+                }
+            );
+            return User
+                .findByIdAndUpdate(userID, {admin: true})
+                .then(() => {
+                    return chai.request(app)
+                        .delete(`/api/users/${userID}`)
+                        .set('authorization', `Bearer ${token}`)
+                        .then(res => {
+                            expect(res).to.have.status(403);
+                        })
+                })
+        })
     });
 
     describe('GET endpoint for specfic user', () => {
