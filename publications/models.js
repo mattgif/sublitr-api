@@ -10,11 +10,13 @@ const PublicationSchema = new mongoose.Schema({
         type: String,
         required: true,
         unique: true
-    }
+    },
+    editors: Object,
+    image: String
 });
 
 PublicationSchema.methods.serialize = function() {
-    return {title: this.title, abbr: this.abbr};
+    return {id: this._id, title: this.title, abbr: this.abbr, editors: this.editors, image: this.image};
 };
 
 const Publication = mongoose.model('Publication', PublicationSchema);
