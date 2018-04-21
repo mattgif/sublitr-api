@@ -15,8 +15,6 @@ const jwtAuth = passport.authenticate('jwt', {session: false});
 const MAX_FILE_SIZE = 25 * 1024 *1024; // 25 MB
 
 router.use(jsonParser);
-router.use(jwtAuth);
-
 
 router.get('/', (req, res) => {
     Publication.find()
@@ -25,7 +23,7 @@ router.get('/', (req, res) => {
         });
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', jwtAuth, (req, res) => {
     if (!req.user.admin) {
         return Promise.reject({
             code: 401,
@@ -50,7 +48,7 @@ router.delete('/:id', (req, res) => {
         })
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', jwtAuth, (req, res) => {
     if (!req.user.admin) {
         return Promise.reject({
             code: 401,
@@ -98,7 +96,7 @@ router.put('/:id', (req, res) => {
 
 });
 
-router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload({ limits: { fileSize: MAX_FILE_SIZE } , abortOnLimit: true})], (req, res) => {
+router.post('/', [jwtAuth, bodyParser.urlencoded({ extended: true }), fileUpload({ limits: { fileSize: MAX_FILE_SIZE } , abortOnLimit: true})], (req, res) => {
     if (!req.user.admin) {
         return Promise.reject({
             code: 401,
@@ -203,7 +201,5 @@ router.post('/', [bodyParser.urlencoded({ extended: true }), fileUpload({ limits
             res.status(500).json({code: 500, message: 'Internal server error'})
         });
 });
-
-
 
 module. exports = router;
