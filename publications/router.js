@@ -9,6 +9,7 @@ const Publication = require('./models');
 const {s3PublicUpload, s3PublicDelete} = require('./aws-handler');
 
 const router = express.Router();
+const DEFAULT_IMAGE = 'https://s3.amazonaws.com/sublitr-images/logo.svg';
 
 const jsonParser = bodyParser.json();
 const jwtAuth = passport.authenticate('jwt', {session: false});
@@ -33,7 +34,7 @@ router.delete('/:id', jwtAuth, (req, res) => {
     }
     return Publication.findById(req.params.id)
         .then(pub => {
-            if (pub.image) {
+            if (pub.image && pub.image !== DEFAULT_IMAGE) {
                 s3PublicDelete(pub.image)
             }
             pub.remove()
@@ -65,11 +66,11 @@ router.put('/:id', jwtAuth, (req, res) => {
         }, {});
     }
 
+    let image;
     return Publication.findById(req.params.id)
         .then(pub => {
             if (req.files && req.files.image) {
-                let image;
-                if (pub.image) {
+                if (pub.image && pub.image !== DEFAULT_IMAGE) {
                     image = pub.image;
                 } else {
                     image = `https://s3.amazonaws.com/sublitr-images/${pub.abbr}-image.jpg`;
@@ -81,6 +82,7 @@ router.put('/:id', jwtAuth, (req, res) => {
                     Body: req.files.image.data,
                     ContentType: req.files.image.mimetype
                 });
+                pub.image = image;
             }
             Object.keys(req.body).forEach(key => {
                 pub[key] = req.body[key]

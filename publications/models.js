@@ -12,7 +12,11 @@ const PublicationSchema = new mongoose.Schema({
         unique: true
     },
     editors: Object,
-    image: String
+    image: {
+        type: String,
+        required: true,
+        default: 'https://s3.amazonaws.com/sublitr-images/logo.svg'
+    }
 });
 
 PublicationSchema.methods.serialize = function() {
