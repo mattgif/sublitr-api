@@ -6,6 +6,7 @@ const mime = require('mime-types');
 const fs = require('fs');
 const shortid = require('shortid');
 const Publication = require('./models');
+const {User} = require('../users/models');
 const {s3PublicUpload, s3PublicDelete} = require('./aws-handler');
 
 const router = express.Router();
@@ -58,35 +59,25 @@ router.put('/:id', jwtAuth, (req, res) => {
         })
     }
 
-    const updatedPublication = {};
-    if (req.body.editors) {
-        updatedPublication.editors = JSON.parse(req.body.editors).reduce((acc, user) => {
-            acc[user.email] = user;
-            return acc;
-        }, {});
+    if (!req.body.editors) {
+        return res.status(422).json({
+            code: 422,
+            reason: 'ValidationError',
+            message: 'Missing field',
+            location: 'editors'
+        })
     }
 
-    let image;
+    const {editors} = req.body;
+
+    // toggle editor to true for all users included as editor
+    const editorIds = Object.keys(editors).map(e => {return editors[e].id});
+    User.updateMany( {_id: {$in : editorIds}}, {editor: true} ).then(() => console.log('updated')).catch(console.error)
+
     return Publication.findById(req.params.id)
         .then(pub => {
-            if (req.files && req.files.image) {
-                if (pub.image && pub.image !== DEFAULT_IMAGE) {
-                    image = pub.image;
-                } else {
-                    image = `https://s3.amazonaws.com/sublitr-images/${pub.abbr}-image.jpg`;
-                }
-                const split = image.split('/');
-                const key = split[split.length-1];
-                s3PublicUpload({
-                    Key: key,
-                    Body: req.files.image.data,
-                    ContentType: req.files.image.mimetype
-                });
-                pub.image = image;
-            }
-            Object.keys(req.body).forEach(key => {
-                pub[key] = req.body[key]
-            });
+            console.log(editors);
+            pub.editors = editors;
             pub.save().then((pub) => res.status(200).json(pub.serialize()));
         })
         .catch(err => {
@@ -106,6 +97,7 @@ router.post('/', [jwtAuth, bodyParser.urlencoded({ extended: true }), fileUpload
             message: 'Only admins can create publications'
         })
     }
+
     const requiredFields = ['title'];
     const missingField = requiredFields.find(field => !(field in req.body));
     if (missingField) {
@@ -156,10 +148,14 @@ router.post('/', [jwtAuth, bodyParser.urlencoded({ extended: true }), fileUpload
 
     let editors = {};
     if (req.body.editors) {
+        // parse array, then toggle editor to true for all editor ids
         editors = JSON.parse(req.body.editors).reduce((acc, user) => {
             acc[user.email] = user;
             return acc;
         }, {});
+
+        // const editorIds = Object.keys(editors).map(e => editors[e].id);
+        // User.updateMany( {_id: {$in : editorIds}}, {editor: true} ).catch(console.error)
     }
 
     const newPublication = {
