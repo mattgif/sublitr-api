@@ -36,20 +36,21 @@ router.get('/', (req, res) => {
         const userId = req.user.id;
         const editorQuery = {};
         editorQuery[`editors.${userId}`] = {$exists:true};
-        let publicationsEdited = [];
-        Publication.find(editorQuery)
+        return Publication.find(editorQuery)
         // find all pubs where user is listed as editor, and add that pub's title to array
             .then(pubs => {
-                pubs.forEach(pub => {publicationsEdited.push[pub.title]});
+                const publicationsEdited = pubs.map(pub => {return pub.title});
+                console.log('edits', publicationsEdited);
                 Submission.find({$or: [ {authorID: userId}, {publication : { $in : publicationsEdited}}]})
                 // find all subs that the user either wrote or was submitted to a journal they edited
                     .then(subs => {
                         // return editor info if user is editor of the publication it was submitted to
-                        const submissions = subs.map(submission => submission.serialize(publicationsEdited.includes(submission.publication)))
+                        const submissions = subs.map(submission => submission.serialize(publicationsEdited.includes(submission.publication)));
                         res.status(200).json(submissions)
                     })
             })
-            .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
+            .catch(console.error)
+        // .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
     } else {
         // neither editor nor admin - return only items matching requester's own id
         return Submission.find({authorID: req.user.id})
