@@ -6,7 +6,7 @@ const mime = require('mime-types');
 const fs = require('fs');
 const shortid = require('shortid');
 
-const {Publication} = require('../publications/models');
+const Publication = require('../publications/models');
 const {Submission} = require('../submissions/models');
 const {s3Upload, s3Delete, s3Get} = require('./aws-handler');
 

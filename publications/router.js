@@ -150,7 +150,7 @@ router.post('/', [jwtAuth, bodyParser.urlencoded({ extended: true }), fileUpload
     if (req.body.editors) {
         // parse array, then toggle editor to true for all editor ids
         editors = JSON.parse(req.body.editors).reduce((acc, user) => {
-            acc[user.email] = user;
+            acc[user.id] = user;
             return acc;
         }, {});
 
