@@ -8,6 +8,7 @@ const fs = require('fs');
 const {app, runServer, closeServer} = require('../server');
 const {TEST_DATABASE_URL, JWT_SECRET} = require('../config');
 const {Submission} = require('../submissions/models');
+const Publication = require('../publications/models');
 
 const expect = chai.expect;
 
@@ -21,6 +22,8 @@ const editorEmail = 'editorTest@example.com';
 const editorFirst = 'Ed';
 const editorLast = 'Ditor';
 const editorID = '098765431';
+const editorJournal = 'Test publication';
+const editorArticle = 'Awesome submission'
 const userEmail = 'testUser@example.com';
 const userID = '1234567880';
 const userFirst = 'Usey';
@@ -159,24 +162,29 @@ describe('submissions API', () => {
             })
         });
 
-        it('should return a list of all submissions for editors', () => {
-            return chai.request(app)
-                .get('/api/submissions')
-                .set('authorization', `Bearer ${editorToken}`)
-                .then(res => {
-                    expect(res).to.have.status(200);
-                    expect(res).to.be.json;
-                    expect(res.body).to.be.an('array');
-                    expect(res.body).to.have.length(NUM_SUBMISSIONS_IN_DB);
-                    const randomIndex = Math.floor(Math.random() * (NUM_SUBMISSIONS_IN_DB - 1));
-                    const testSub = res.body[randomIndex];
-                    expectedFields.forEach(field => { expect(field in testSub).to.be.true });
-                    expect('reviewerInfo' in testSub).to.be.true;
-                    expect('file' in testSub).to.be.true;
-                    expect(testSub.status).to.equal('pending');
-                    expect(testSub.reviewerInfo.decision).to.equal('pending');
-                    expect(testSub.reviewerInfo.recommendation).to.equal('none');
-                })
+        it('should return a list of editors\' own submissions, and those for journals they edit', () => {
+            Publication.create({
+                title: 'Test Publication',
+                image: 'www.example.com',
+                editors: {editorID: {email: editorEmail, id: {editorID}}}
+            }).then(() => Submission.create({
+                title: 'Sub Title',
+                authorID: 89689234892345892345789,
+                publication: 'Test Publication',
+                file: 'example.com'
+            }).then(() => {
+                return chai.request(app)
+                    .get('/api/submissions')
+                    .set('authorization', `Bearer ${editorToken}`)
+                    .then(res => {
+                        expect(res).to.have.status(200);
+                        expect(res).to.be.json;
+                        expect(res.body).to.be.an('array');
+                        expect(res.body).to.have.length(1);
+                        expect(res.body[0].title).to.equal('Sub Title');
+                    })
+                }
+            ));
         });
 
         it('should return a list of all submissions for admin', () => {

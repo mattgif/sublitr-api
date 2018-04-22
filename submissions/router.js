@@ -6,6 +6,7 @@ const mime = require('mime-types');
 const fs = require('fs');
 const shortid = require('shortid');
 
+const {Publication} = require('../publications/models');
 const {Submission} = require('../submissions/models');
 const {s3Upload, s3Delete, s3Get} = require('./aws-handler');
 
@@ -19,18 +20,44 @@ router.use(jsonParser);
 router.use(jwtAuth);
 
 router.get('/', (req, res) => {
-    const adminOrAuthor = (req.user.admin || req.user.editor);
-    let query;
-    if (!adminOrAuthor) {
-        // set query so we only return items matching requester's own id
-        query = {authorID: req.user.id}
-    }
+    const {admin, editor} = req.user;
 
-    Submission.find(query)
-        .then(_submissions => {
-            const submissions = _submissions.map(submission => submission.serialize(adminOrAuthor));
-            res.status(200).json(submissions)
-        })
+    if (admin) {
+        // return all submissions with full info for admin
+        return Submission.find()
+            .then(_submissions => {
+                const submissions = _submissions.map(submission => submission.serialize(true));
+                res.status(200).json(submissions)
+            })
+            .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}));
+    } else if (editor) {
+        // return editor's own submissions, and submissions for the journals they edit
+        // only include reviewer details for the latter
+        const userId = req.user.id;
+        const editorQuery = {};
+        editorQuery[`editors.${userId}`] = {$exists:true};
+        let publicationsEdited = [];
+        Publication.find(editorQuery)
+        // find all pubs where user is listed as editor, and add that pub's title to array
+            .then(pubs => {
+                pubs.forEach(pub => {publicationsEdited.push[pub.title]});
+                Submission.find({$or: [ {authorID: userId}, {publication : { $in : publicationsEdited}}]})
+                // find all subs that the user either wrote or was submitted to a journal they edited
+                    .then(subs => {
+                        // return editor info if user is editor of the publication it was submitted to
+                        const submissions = subs.map(submission => submission.serialize(publicationsEdited.includes(submission.publication)))
+                        res.status(200).json(submissions)
+                    })
+            })
+            .catch(() => res.status(500).json({code: 500, message: 'Internal server error'}))
+    } else {
+        // neither editor nor admin - return only items matching requester's own id
+        return Submission.find({authorID: req.user.id})
+            .then(_submissions => {
+                const submissions = _submissions.map(submission => submission.serialize());
+                res.status(200).json(submissions)
+            }).catch(() => res.status(500).json({code: 500, message: 'Internal server error'}));
+    }
 });
 
 router.get('/:submissionID', (req, res) => {
