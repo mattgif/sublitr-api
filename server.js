@@ -23,10 +23,9 @@ const app = express();
 
 app.use(morgan('common'));
 
-// TODO: remove localhost for production
 app.use(
     cors({
-        origin: [CLIENT_ORIGIN, 'http://localhost:8080']
+        origin: CLIENT_ORIGIN
     })
 );
 
