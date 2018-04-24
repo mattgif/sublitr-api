@@ -16,23 +16,12 @@ mongoose.Promise = global.Promise;
 
 const PORT = process.env.PORT || 3000;
 
-const {CLIENT_ORIGIN, DATABASE_URL} = require('./config');
+const {DATABASE_URL} = require('./config');
 const {localStrategy, jwtStrategy} = require('./auth/strategies');
 
 const app = express();
 
-const whitelist = CLIENT_ORIGIN;
-const corsOptions = {
-    origin: function (origin, callback) {
-        if (whitelist.indexOf(origin) !== -1) {
-            callback(null, true)
-        } else {
-            callback(new Error('Not allowed by CORS'))
-        }
-    }
-};
-
-app.use(cors(corsOptions));
+app.use(cors());
 
 app.use(morgan('common'));
 
