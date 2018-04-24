@@ -2,7 +2,6 @@
 
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const morgan = require('morgan');
 const passport = require('passport');
 const mongoose = require('mongoose');
@@ -16,18 +15,18 @@ mongoose.Promise = global.Promise;
 
 const PORT = process.env.PORT || 3000;
 
-const {CLIENT_ORIGIN, DATABASE_URL} = require('./config');
+const {DATABASE_URL} = require('./config');
 const {localStrategy, jwtStrategy} = require('./auth/strategies');
 
 const app = express();
 
 app.use(morgan('common'));
 
-app.use(
-    cors({
-        origin: CLIENT_ORIGIN
-    })
-);
+app.use(function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+});
 
 passport.use(localStrategy);
 passport.use(jwtStrategy);
