@@ -5,8 +5,7 @@ Streamlined submission manager (api)
 * Site: https://www.sublitr.com
 * Main repo: https://github.com/mattgif/sublitr
 
-## API
-### Repo link: https://github.com/mattgif/sublitr-api
+## API documentation
 sublitr's API is secured using JSON web tokens (JWT) with Passport.js, and are fully tested with Mocha/Chai.
 
 ### Auth endpoints
