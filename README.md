@@ -1,8 +1,9 @@
 # sublitr-api
 
 Streamlined submission manager (api)
-Site: https://www.sublitr.com
-Main repo: https://github.com/mattgif/sublitr
+
+* Site: https://www.sublitr.com
+* Main repo: https://github.com/mattgif/sublitr
 
 ## API
 ### Repo link: https://github.com/mattgif/sublitr-api
